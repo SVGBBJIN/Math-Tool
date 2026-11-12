@@ -9,7 +9,7 @@ precalculus. Next.js (App Router, TypeScript) · Supabase (Postgres, auth, stora
 |---|---|---|
 | **M1** | Schema, auth, problem bank, trainer, error log | ✅ built, tested |
 | M2 | Sendblue sending, scheduler, inbound webhook, escalation tests | next |
-| M3 | Khan Academy proof entry | |
+| M3 | Khan Academy proof entry | UI built (`/khan`); requirement date ranges still to do |
 | M4 | Endurance mode + vault | |
 | M5 | Problem generator with verification | |
 | M6 | Timeline and progress maps | |
