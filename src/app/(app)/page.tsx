@@ -7,11 +7,11 @@ import { addDays, daysBetween, weekday } from "@/lib/dates";
 const ITEM_LINKS: Partial<Record<PlanItem, string>> = {
   trainer: "/trainer",
   error_review: "/errors",
+  khan: "/khan",
 };
 const COMING: Partial<Record<PlanItem, string>> = {
   timed_block: "Endurance mode arrives in M4",
   saturday_review: "Arrives with endurance mode (M4)",
-  khan: "Khan proof entry arrives in M3",
 };
 
 export default async function TodayPage() {
