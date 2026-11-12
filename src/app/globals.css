@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #1865f2;        /* primary action blue */
+  --color-brand-dark: #0b4fc4;
+  --color-mastery: #14bf96;      /* mastered / correct */
+  --color-proficient: #6fa3ff;
+  --color-familiar: #ffb100;
+  --color-danger: #d92916;
+  --color-ink: #21242c;
+  --color-muted: #5b6270;
+  --color-line: #e3e5ea;
+  --color-canvas: #f7f8fa;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+html,
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+/* Shared primitives */
+@layer components {
+  .card {
+    @apply rounded-2xl border border-line bg-white p-4 shadow-sm;
+  }
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2 font-semibold text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line bg-white px-4 py-2 font-semibold text-ink transition hover:bg-canvas disabled:opacity-50;
+  }
+  .input {
+    @apply w-full rounded-xl border border-line bg-white px-3 py-2 text-base outline-none focus:border-brand focus:ring-2 focus:ring-brand/20;
+  }
+  .label {
+    @apply mb-1 block text-sm font-semibold text-muted;
+  }
+  .chip {
+    @apply inline-flex items-center rounded-full bg-canvas px-2 py-0.5 text-xs font-medium text-muted;
+  }
+  .h1 {
+    @apply text-2xl font-bold tracking-tight;
+  }
+  .h2 {
+    @apply text-lg font-bold;
+  }
+}
