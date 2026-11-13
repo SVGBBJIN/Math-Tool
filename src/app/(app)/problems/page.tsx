@@ -26,7 +26,6 @@ export default async function ProblemsPage({ searchParams }: { searchParams: Pro
   const { data: all } = await ctx.supabase.from("problems").select("status").eq("household_id", ctx.household.id);
   const counts = { train: 0, vault: 0, burned: 0 } as Record<string, number>;
   (all ?? []).forEach((p) => (counts[p.status] = (counts[p.status] ?? 0) + 1));
-  const isParent = ctx.profile.role === "parent";
 
   return (
     <div className="space-y-4">
@@ -44,7 +43,7 @@ export default async function ProblemsPage({ searchParams }: { searchParams: Pro
         </div>
       </section>
 
-      <AddProblemForms isParent={isParent} />
+      <AddProblemForms />
 
       <ul className="space-y-2">
         {(problems ?? []).length === 0 && <li className="card text-muted">No problems yet. Add some above.</li>}
@@ -75,7 +74,7 @@ export default async function ProblemsPage({ searchParams }: { searchParams: Pro
                   </details>
                 </div>
               )}
-              <RowActions id={p.id} status={p.status} isParent={isParent} />
+              <RowActions id={p.id} status={p.status} />
             </li>
           );
         })}

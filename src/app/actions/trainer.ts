@@ -1,7 +1,7 @@
 "use server";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { requireStudent } from "@/lib/session";
+import { requireContext } from "@/lib/session";
 import { applyMiss, applyTwinOutcome, primaryTechnique } from "@/lib/review";
 import { refreshTrainerActivity } from "@/lib/data";
 
@@ -24,7 +24,7 @@ export async function submitAttempt(input: z.input<typeof SubmitSchema>): Promis
   const parsed = SubmitSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Invalid submission" };
   const { sessionId, problemId, answer, confidence, familiar, seconds } = parsed.data;
-  const { supabase: db, profile, household, today } = await requireStudent();
+  const { supabase: db, profile, household, today } = await requireContext();
 
   const { data: session } = await db
     .from("trainer_sessions")
@@ -138,7 +138,7 @@ export async function finalizeAttempt(input: z.input<typeof FinalizeSchema>): Pr
   const parsed = FinalizeSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   const { attemptId, keyIdea, errorType } = parsed.data;
-  const { supabase: db, profile, household } = await requireStudent();
+  const { supabase: db, profile, household } = await requireContext();
 
   const { data: attempt } = await db
     .from("attempts")

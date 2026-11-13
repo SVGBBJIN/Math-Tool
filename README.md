@@ -34,14 +34,14 @@ npx supabase db reset       # applies supabase/migrations
 Copy `.env.example` to `.env.local` and fill it from the output of `npx supabase status`. Then:
 
 ```bash
-npm run seed:demo           # LOCAL ONLY: demo parent/student logins + 20 original practice problems
+npm run seed:demo           # LOCAL ONLY: a demo account + 20 original practice problems
 ```
 
 ```bash
 npm run dev
 ```
 
-Demo logins (local only): `parent@demo.local` / `student@demo.local`, password `demo-password-123`.
+Demo login (local only): `demo@demo.local`, password `demo-password-123`. Or just click **Create account** on the login page.
 
 ### Tests
 
@@ -53,11 +53,28 @@ npm test          # unit tests: plan/streak, spaced review, trainer selection
 npm run test:db   # row-level-security checks against the local Supabase (needs seed:demo)
 ```
 
+## Connecting a Supabase project
+
+1. Create a project at supabase.com (or reuse one) and copy **Project URL**, the **publishable** key and the
+   **secret** key from Project Settings → API into `.env.local` (see `.env.example`).
+2. Apply the migrations: `npx supabase link --project-ref <ref>` then `npx supabase db push`.
+3. Auth → URL Configuration: set **Site URL** to your deployed URL and add `<your URL>/auth/callback` (and
+   `http://127.0.0.1:3000/auth/callback` for local) to **Redirect URLs**.
+4. Auth → Providers → Email: choose whether **Confirm email** is required. Both work: with it on, the form
+   says "Check your email" and the link lands on `/auth/callback`; with it off, sign-up signs the user straight in.
+5. Optional: set `NEXT_PUBLIC_SITE_URL` if the confirmation link must use a fixed origin.
+
+Accounts that existed before the self-service migration are repaired on their next request (`ensure_account`).
+The old `role` column is kept but no longer used; old `parent` rows keep working as ordinary accounts.
+
 ## How M1 works
 
-- **Accounts.** A parent signs up and confirms they are the parent or guardian. They create the household, then
-  create the student's login. The student never signs up on their own. Only the parent can change settings; only
-  the student can log attempts. Row-level security covers every table (`tests/db/rls.test.ts`).
+- **Accounts.** Anyone can create an account with a name, email and password (`signUp` in
+  `src/app/actions/account.ts`). Supabase creates the auth user; the `handle_new_user` trigger
+  (`supabase/migrations/20261113000000_self_service_accounts.sql`) creates the profile and the settings row
+  (table `households`, one per account: it is the key every other table is scoped by) from the sign-up
+  metadata. There are no roles: every account owns its own data. Row-level security covers every table
+  (`tests/db/rls.test.ts`).
 - **Daily plan.** Mon/Tue/Thu/Fri trainer · Wed error-log review · Sat timed block · Sun review of Saturday
   (`src/lib/plan.ts`). The streak survives if every required item is done **or** at least 10 minutes of plan work are
   logged. An unfinished *today* never breaks the streak. Khan becomes a requirement in M3, and the timed block and

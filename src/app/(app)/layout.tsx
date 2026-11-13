@@ -10,7 +10,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div>
           <p className="text-lg font-extrabold tracking-tight text-brand">AMC Coach</p>
           <p className="text-xs text-muted">
-            {profile.display_name} · {profile.role} · {household.timezone}
+            {profile.display_name} · {household.timezone}
           </p>
         </div>
         <form action={signOut}>

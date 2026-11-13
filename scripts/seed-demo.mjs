@@ -1,4 +1,4 @@
-// Seeds LOCAL demo data: a parent + student login and 20 original practice problems.
+// Seeds LOCAL demo data: a demo account and 20 original practice problems.
 // Usage: node --env-file=.env.local scripts/seed-demo.mjs
 // Refuses to run against anything but a local Supabase.
 import { createClient } from "@supabase/supabase-js";
@@ -15,33 +15,26 @@ if (!["127.0.0.1", "localhost"].includes(host)) {
 const db = createClient(url, key, { auth: { persistSession: false } });
 const PASSWORD = "demo-password-123";
 
-async function ensureUser(email) {
+// Creating the user fires the handle_new_user trigger, which creates the profile + settings row.
+async function ensureUser(email, displayName) {
   const { data: list } = await db.auth.admin.listUsers();
   const found = list.users.find((u) => u.email === email);
   if (found) return found.id;
-  const { data, error } = await db.auth.admin.createUser({ email, password: PASSWORD, email_confirm: true });
+  const { data, error } = await db.auth.admin.createUser({
+    email,
+    password: PASSWORD,
+    email_confirm: true,
+    user_metadata: { display_name: displayName, timezone: "America/Los_Angeles" },
+  });
   if (error) throw error;
   return data.user.id;
 }
 
-const parentId = await ensureUser("parent@demo.local");
-const studentId = await ensureUser("student@demo.local");
-
-let { data: parentProfile } = await db.from("profiles").select("household_id").eq("id", parentId).maybeSingle();
-let householdId = parentProfile?.household_id;
-if (!householdId) {
-  const { data: h, error } = await db
-    .from("households")
-    .insert({ name: "Demo household", timezone: "America/Los_Angeles", amc_date: "2027-03-04", created_by: parentId })
-    .select("id")
-    .single();
-  if (error) throw error;
-  householdId = h.id;
-  await db.from("profiles").insert([
-    { id: parentId, household_id: householdId, role: "parent", display_name: "Demo Parent" },
-    { id: studentId, household_id: householdId, role: "student", display_name: "Demo Student" },
-  ]);
-}
+const userId = await ensureUser("demo@demo.local", "Demo Student");
+const { data: profile, error: profErr } = await db.from("profiles").select("household_id").eq("id", userId).single();
+if (profErr) throw new Error(`No profile for the demo user. Is the self_service_accounts migration applied? ${profErr.message}`);
+const householdId = profile.household_id;
+await db.from("households").update({ amc_date: "2027-03-04" }).eq("id", householdId);
 
 const problems = JSON.parse(readFileSync(new URL("./demo/problems.json", import.meta.url)));
 const { count } = await db.from("problems").select("id", { count: "exact", head: true }).eq("household_id", householdId);
@@ -58,9 +51,9 @@ if (!count) {
       topic_tags: p.topics,
       technique_tags: p.techniques,
       status: "train",
-      created_by: parentId,
+      created_by: userId,
     })),
   );
   if (error) throw error;
 }
-console.log(`Seeded. Logins (local only): parent@demo.local / student@demo.local, password ${PASSWORD}`);
+console.log(`Seeded. Login (local only): demo@demo.local, password ${PASSWORD}`);

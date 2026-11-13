@@ -1,4 +1,4 @@
-import { householdStudent, requireContext } from "@/lib/session";
+import { requireContext } from "@/lib/session";
 import { ERROR_TYPES, label } from "@/lib/tags";
 import { ERROR_REVIEW_TARGET } from "@/lib/plan";
 import { weekday } from "@/lib/dates";
@@ -6,20 +6,18 @@ import { ReviewClient, type MissRow } from "./ReviewClient";
 
 export default async function ErrorsPage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
   const ctx = await requireContext();
-  const student = await householdStudent(ctx);
-  if (!student) return <div className="card text-muted">No student yet.</div>;
   const { type } = await searchParams;
 
   const [{ data: misses }, { data: reviews }, { count: total }] = await Promise.all([
     ctx.supabase
       .from("attempts")
       .select("id, local_date, answer, error_type, key_idea, seconds, familiar, problems(id, source, contest, year, number, url, solution_url, statement, answer, technique_tags)")
-      .eq("student_id", student.id)
+      .eq("student_id", ctx.profile.id)
       .eq("correct", false)
       .eq("finalized", true)
       .order("created_at", { ascending: true }),
-    ctx.supabase.from("error_reviews").select("attempt_id, takeaway, local_date").eq("student_id", student.id),
-    ctx.supabase.from("attempts").select("id", { count: "exact", head: true }).eq("student_id", student.id).eq("finalized", true).eq("familiar", false),
+    ctx.supabase.from("error_reviews").select("attempt_id, takeaway, local_date").eq("student_id", ctx.profile.id),
+    ctx.supabase.from("attempts").select("id", { count: "exact", head: true }).eq("student_id", ctx.profile.id).eq("finalized", true).eq("familiar", false),
   ]);
 
   type Raw = {
@@ -66,14 +64,12 @@ export default async function ErrorsPage({ searchParams }: { searchParams: Promi
         </div>
       </section>
 
-      {ctx.profile.role === "student" && (
-        <ReviewClient
-          pending={pending}
-          reviewedToday={reviewedToday}
-          target={Math.min(ERROR_REVIEW_TARGET, pending.length + reviewedToday)}
-          isWednesday={isWednesday}
-        />
-      )}
+      <ReviewClient
+        pending={pending}
+        reviewedToday={reviewedToday}
+        target={Math.min(ERROR_REVIEW_TARGET, pending.length + reviewedToday)}
+        isWednesday={isWednesday}
+      />
 
       <section className="space-y-2">
         {shown.length === 0 && <p className="card text-muted">No misses here yet.</p>}

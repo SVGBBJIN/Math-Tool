@@ -5,9 +5,6 @@ import { TrainerClient, type TrainerProblem } from "./TrainerClient";
 
 export default async function TrainerPage() {
   const ctx = await requireContext();
-  if (ctx.profile.role !== "student") {
-    return <div className="card text-muted">The trainer is for the student&apos;s login. Parents can follow progress on the Today and Errors tabs.</div>;
-  }
   const db = ctx.supabase;
   const session = await getOrCreateTrainerSession(db, ctx.household.id, ctx.profile.id, ctx.today);
   if (!session) {
