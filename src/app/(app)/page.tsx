@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { householdStudent, requireContext } from "@/lib/session";
+import { requireContext } from "@/lib/session";
 import { getDayStatus, getKeptMap } from "@/lib/data";
 import { PLAN_LABELS, currentStreak, type PlanItem } from "@/lib/plan";
 import { addDays, daysBetween, weekday } from "@/lib/dates";
@@ -16,21 +16,10 @@ const COMING: Partial<Record<PlanItem, string>> = {
 
 export default async function TodayPage() {
   const ctx = await requireContext();
-  const student = await householdStudent(ctx);
-  if (!student) {
-    return (
-      <div className="card">
-        <h1 className="h2">Welcome!</h1>
-        <p className="mt-1 text-muted">Create your student&apos;s login to get started.</p>
-        <Link href="/settings" className="btn mt-4">Go to settings</Link>
-      </div>
-    );
-  }
-
   const { today, household } = ctx;
   const [status, kept] = await Promise.all([
-    getDayStatus(ctx.supabase, student.id, today),
-    getKeptMap(ctx.supabase, student.id, today, 70),
+    getDayStatus(ctx.supabase, ctx.profile.id, today),
+    getKeptMap(ctx.supabase, ctx.profile.id, today, 70),
   ]);
   const streak = currentStreak(kept, today);
   const amcDays = household.amc_date ? daysBetween(today, household.amc_date) : null;
@@ -90,10 +79,10 @@ export default async function TodayPage() {
                   <p className="font-semibold">{PLAN_LABELS[item]}</p>
                   {!done && COMING[item] && <p className="text-xs text-muted">{COMING[item]}</p>}
                 </div>
-                {href && !done && ctx.profile.role === "student" && <span className="text-sm font-semibold text-brand">Start →</span>}
+                {href && !done && <span className="text-sm font-semibold text-brand">Start →</span>}
               </div>
             );
-            return <li key={item}>{href && ctx.profile.role === "student" ? <Link href={href}>{body}</Link> : body}</li>;
+            return <li key={item}>{href ? <Link href={href}>{body}</Link> : body}</li>;
           })}
         </ul>
         <p className="mt-3 text-xs text-muted">
