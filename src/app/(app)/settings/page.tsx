@@ -1,5 +1,5 @@
 import { householdStudent, requireContext } from "@/lib/session";
-import { HouseholdForm, StudentForm } from "./SettingsForms";
+import { HouseholdForm, StudentForm, TextRemindersForm } from "./SettingsForms";
 
 export default async function SettingsPage() {
   const ctx = await requireContext();
@@ -33,7 +33,11 @@ export default async function SettingsPage() {
       </section>
       <section className="card">
         <h2 className="h2">Text reminders</h2>
-        <p className="mt-1 text-sm text-muted">Phone numbers, the reminder ladder, quiet hours and the daily cap arrive in M2.</p>
+        <p className="mt-1 text-sm text-muted">
+          Off by default. This is the only switch for reminders: the trainer, math scroll and error review work the same either way.
+          Sending, phone numbers, the reminder ladder, quiet hours and the daily cap arrive in M2.
+        </p>
+        <TextRemindersForm enabled={ctx.household.texts_enabled} disabled={!isParent} />
       </section>
     </div>
   );

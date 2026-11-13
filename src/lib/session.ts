@@ -10,6 +10,7 @@ export interface Household {
   amc_date: string | null;
   finals_start: string | null;
   finals_end: string | null;
+  texts_enabled: boolean;
 }
 
 export interface Profile {
@@ -36,7 +37,7 @@ export async function requireContext() {
 
   const { data: household } = await supabase
     .from("households")
-    .select("id, name, timezone, amc_date, finals_start, finals_end")
+    .select("id, name, timezone, amc_date, finals_start, finals_end, texts_enabled")
     .eq("id", profile.household_id)
     .single<Household>();
   if (!household) redirect("/setup");

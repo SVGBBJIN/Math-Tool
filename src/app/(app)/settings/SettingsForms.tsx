@@ -1,6 +1,6 @@
 "use client";
 import { useActionState } from "react";
-import { createStudent, updateSettings, type FormState } from "../../actions/account";
+import { createStudent, setTextReminders, updateSettings, type FormState } from "../../actions/account";
 import { FormMessage } from "@/components/FormMessage";
 
 export function HouseholdForm(props: { disabled: boolean; timezone: string; amcDate: string; finalsStart: string; finalsEnd: string }) {
@@ -51,6 +51,20 @@ export function StudentForm() {
         <input id="sPassword" name="password" type="password" minLength={8} className="input" required autoComplete="new-password" />
       </div>
       <button className="btn w-full" disabled={pending}>Create student login</button>
+      <FormMessage state={state} />
+    </form>
+  );
+}
+
+export function TextRemindersForm({ enabled, disabled }: { enabled: boolean; disabled: boolean }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(setTextReminders, {});
+  return (
+    <form action={action} className="mt-3 space-y-3">
+      <label className="flex min-h-11 items-center gap-3 text-base font-semibold">
+        <input type="checkbox" name="enabled" defaultChecked={enabled} disabled={disabled} className="h-5 w-5" />
+        Send text reminders (Sendblue)
+      </label>
+      {!disabled && <button className="btn w-full" disabled={pending}>Save</button>}
       <FormMessage state={state} />
     </form>
   );
