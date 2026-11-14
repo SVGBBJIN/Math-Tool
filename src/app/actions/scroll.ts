@@ -1,6 +1,6 @@
 "use server";
 import { z } from "zod";
-import { requireStudent } from "@/lib/session";
+import { requireContext } from "@/lib/session";
 import { upsertActivity } from "@/lib/data";
 import { SCROLL_MAX_MINUTES_PER_DAY, SCROLL_MAX_SECONDS_PER_PROBLEM } from "@/lib/scroll";
 
@@ -8,7 +8,7 @@ const Input = z.object({ seconds: z.number().min(0).max(3600) });
 
 /** Credit time spent on one scroll problem toward today's minutes (streak minimum). Never a required item. */
 export async function logScrollProblem(input: { seconds: number }): Promise<{ minutes?: number; error?: string }> {
-  const { supabase: db, profile, household, today } = await requireStudent();
+  const { supabase: db, profile, household, today } = await requireContext();
   const parsed = Input.safeParse(input);
   if (!parsed.success) return { error: "Invalid input" };
   const add = Math.min(parsed.data.seconds, SCROLL_MAX_SECONDS_PER_PROBLEM) / 60;

@@ -1,22 +1,18 @@
-import { householdStudent, requireContext } from "@/lib/session";
+import { requireContext } from "@/lib/session";
 import { KHAN_TARGET_MINUTES, accuracyLabel, summarizeKhanDay } from "@/lib/khan";
 import { KhanForm } from "./KhanForm";
 
 export default async function KhanPage() {
   const ctx = await requireContext();
-  const student = await householdStudent(ctx);
-  if (!student) return <div className="card text-muted">No student yet.</div>;
-
   const { data } = await ctx.supabase
     .from("khan_sessions")
     .select("id, local_date, unit, skill, minutes, questions_correct, questions_total, proof_note, proof_url")
-    .eq("student_id", student.id)
+    .eq("student_id", ctx.profile.id)
     .order("created_at", { ascending: false })
     .limit(30);
   const entries = data ?? [];
   const today = summarizeKhanDay(entries.filter((e) => e.local_date === ctx.today));
   const pct = Math.min(100, Math.round((today.minutes / KHAN_TARGET_MINUTES) * 100));
-  const isStudent = ctx.profile.role === "student";
 
   return (
     <div className="space-y-4">
@@ -35,11 +31,7 @@ export default async function KhanPage() {
         </p>
       </section>
 
-      {isStudent ? (
-        <KhanForm />
-      ) : (
-        <p className="card text-sm text-muted">Only {student.display_name} can log Khan sessions. You can review proof below.</p>
-      )}
+      <KhanForm />
 
       <section className="space-y-2">
         <h2 className="h2">Recent proof</h2>

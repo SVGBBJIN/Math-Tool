@@ -1,7 +1,7 @@
 "use server";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { requireStudent } from "@/lib/session";
+import { requireContext } from "@/lib/session";
 import { upsertActivity } from "@/lib/data";
 import { ERROR_REVIEW_TARGET } from "@/lib/plan";
 
@@ -14,7 +14,7 @@ const Schema = z.object({
 export async function reviewError(input: z.input<typeof Schema>) {
   const parsed = Schema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
-  const { supabase: db, profile, household, today } = await requireStudent();
+  const { supabase: db, profile, household, today } = await requireContext();
   const { attemptId, takeaway, minutes } = parsed.data;
 
   const { error } = await db.from("error_reviews").insert({
@@ -34,7 +34,7 @@ export async function reviewError(input: z.input<typeof Schema>) {
 
 /** Recompute today's error_review activity: done after TARGET reviews or when nothing is left. */
 async function recomputeErrorReviewActivity(addMinutes: number) {
-  const { supabase: db, profile, household, today } = await requireStudent();
+  const { supabase: db, profile, household, today } = await requireContext();
   const [{ count: reviewedToday }, { data: misses }, { data: reviewed }, { data: current }] = await Promise.all([
     db.from("error_reviews").select("id", { count: "exact", head: true }).eq("student_id", profile.id).eq("local_date", today),
     db.from("attempts").select("id").eq("student_id", profile.id).eq("correct", false).eq("finalized", true),
@@ -56,7 +56,7 @@ async function recomputeErrorReviewActivity(addMinutes: number) {
 
 /** When the error log is empty there is nothing to review; mark it done with a short check-in. */
 export async function markNothingToReview() {
-  const { supabase: db, profile, household, today } = await requireStudent();
+  const { supabase: db, profile, household, today } = await requireContext();
   const { data: misses } = await db.from("attempts").select("id").eq("student_id", profile.id).eq("correct", false).eq("finalized", true);
   const { data: reviewed } = await db.from("error_reviews").select("attempt_id").eq("student_id", profile.id);
   const reviewedIds = new Set((reviewed ?? []).map((r) => r.attempt_id));

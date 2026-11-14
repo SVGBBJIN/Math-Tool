@@ -2,7 +2,7 @@
 import { useTransition, useState } from "react";
 import { deleteProblem, setProblemStatus } from "../../actions/problems";
 
-export function RowActions({ id, status, isParent }: { id: string; status: string; isParent: boolean }) {
+export function RowActions({ id, status }: { id: string; status: string }) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const run = (fn: () => Promise<{ error?: string }>) =>
@@ -18,18 +18,16 @@ export function RowActions({ id, status, isParent }: { id: string; status: strin
       {status === "train" && (
         <button className="text-muted" disabled={pending} onClick={() => run(() => setProblemStatus(id, "burned"))}>Mark burned</button>
       )}
-      {isParent && status === "train" && (
+      {status === "train" && (
         <button className="text-muted" disabled={pending} onClick={() => run(() => setProblemStatus(id, "vault"))}>Seal in vault</button>
       )}
-      {isParent && (
-        <button
-          className="ml-auto text-danger"
-          disabled={pending}
-          onClick={() => confirm("Delete this problem and its attempts?") && run(() => deleteProblem(id))}
-        >
-          Delete
-        </button>
-      )}
+      <button
+        className="ml-auto text-danger"
+        disabled={pending}
+        onClick={() => confirm("Delete this problem and its attempts?") && run(() => deleteProblem(id))}
+      >
+        Delete
+      </button>
       {error && <span className="w-full text-danger">{error}</span>}
     </div>
   );

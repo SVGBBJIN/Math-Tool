@@ -4,7 +4,7 @@
 import type { DayStatus } from "../plan";
 
 export interface NagInput {
-  /** households.texts_enabled: the parent's master switch. Default off. */
+  /** households.texts_enabled: the master switch. Default off. */
   textsEnabled: boolean;
   status: Pick<DayStatus, "complete">;
 }

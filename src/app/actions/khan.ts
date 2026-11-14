@@ -1,13 +1,13 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { requireStudent } from "@/lib/session";
+import { requireContext } from "@/lib/session";
 import { upsertActivity } from "@/lib/data";
 import { KhanEntrySchema, summarizeKhanDay, type KhanEntryInput } from "@/lib/khan";
 
 export async function logKhanSession(input: KhanEntryInput) {
   const parsed = KhanEntrySchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
-  const { supabase: db, profile, household, today } = await requireStudent();
+  const { supabase: db, profile, household, today } = await requireContext();
   const e = parsed.data;
 
   const { error } = await db.from("khan_sessions").insert({

@@ -7,7 +7,7 @@ import { TECHNIQUES, TOPICS } from "@/lib/tags";
 
 type Tab = "aops" | "paste" | "csv";
 
-export function AddProblemForms({ isParent }: { isParent: boolean }) {
+export function AddProblemForms() {
   const [tab, setTab] = useState<Tab | null>(null);
   const [aopsState, aopsAction, aopsPending] = useActionState<FormState, FormData>(addAopsProblem, {});
   const [pasteState, pasteAction, pastePending] = useActionState<FormState, FormData>(addPastedProblem, {});
@@ -57,7 +57,7 @@ export function AddProblemForms({ isParent }: { isParent: boolean }) {
               <label className="label" htmlFor="status">Status</label>
               <select id="status" name="status" className="input">
                 <option value="train">train</option>
-                {isParent && <option value="vault">vault (sealed)</option>}
+                <option value="vault">vault (sealed)</option>
               </select>
             </div>
           </div>

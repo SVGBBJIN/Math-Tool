@@ -14,25 +14,45 @@ async function login(email: string, password: string) {
   return c;
 }
 
-describe.skipIf(!local)("RLS", () => {
-  let admin: SupabaseClient, parent: SupabaseClient, student: SupabaseClient, outsider: SupabaseClient;
-  let householdId: string, studentId: string, problemId: string;
+describe.skipIf(!local)("accounts + RLS", () => {
+  let admin: SupabaseClient, user: SupabaseClient, outsider: SupabaseClient;
+  let householdId: string, userId: string, problemId: string;
 
   beforeAll(async () => {
     admin = createClient(url, secret, { auth: { persistSession: false } });
-    parent = await login("parent@demo.local", "demo-password-123");
-    student = await login("student@demo.local", "demo-password-123");
-    // An unrelated user in another household.
+    user = await login("demo@demo.local", "demo-password-123");
+    // An unrelated account. Creating it must provision its own profile + settings row.
     const email = `outsider-${Date.now()}@demo.local`;
     await admin.auth.admin.createUser({ email, password: "outsider-pass-1", email_confirm: true });
     outsider = await login(email, "outsider-pass-1");
-    await outsider.rpc("create_household", { p_name: "Other", p_display_name: "Other parent", p_timezone: "UTC" });
-    const { data: s } = await student.auth.getUser();
-    studentId = s.user!.id;
-    const { data: prof } = await student.from("profiles").select("household_id").eq("id", studentId).single();
+    const { data: u } = await user.auth.getUser();
+    userId = u.user!.id;
+    const { data: prof } = await user.from("profiles").select("household_id").eq("id", userId).single();
     householdId = prof!.household_id;
-    const { data: p } = await student.from("problems").select("id").limit(1).single();
+    const { data: p } = await user.from("problems").select("id").limit(1).single();
     problemId = p!.id;
+  });
+
+  it("creating an auth user provisions a profile and a settings row", async () => {
+    const { data: me } = await outsider.auth.getUser();
+    const { data: prof } = await outsider.from("profiles").select("household_id, display_name").eq("id", me.user!.id).single();
+    expect(prof?.display_name).toMatch(/^outsider-/);
+    const { data: h } = await outsider.from("households").select("id, timezone").eq("id", prof!.household_id).single();
+    expect(h?.timezone).toBe("America/Los_Angeles");
+    expect(prof!.household_id).not.toBe(householdId);
+  });
+
+  it("sign-up metadata sets the display name and a valid time zone; a bad zone falls back", async () => {
+    const mk = async (tz: string) => {
+      const email = `meta-${Date.now()}-${Math.random().toString(36).slice(2)}@demo.local`;
+      const { data } = await admin.auth.admin.createUser({
+        email, password: "meta-pass-123", email_confirm: true, user_metadata: { display_name: "Ada", timezone: tz },
+      });
+      const { data: prof } = await admin.from("profiles").select("display_name, households(timezone)").eq("id", data.user!.id).single();
+      return prof as unknown as { display_name: string; households: { timezone: string } };
+    };
+    expect(await mk("Europe/London")).toMatchObject({ display_name: "Ada", households: { timezone: "Europe/London" } });
+    expect((await mk("Not/AZone")).households.timezone).toBe("America/Los_Angeles");
   });
 
   it("anonymous users see nothing", async () => {
@@ -41,33 +61,32 @@ describe.skipIf(!local)("RLS", () => {
     expect(data).toEqual([]);
   });
 
-  it("another household cannot read or write ours", async () => {
+  it("another account cannot read or write ours", async () => {
     expect((await outsider.from("problems").select("id").eq("household_id", householdId)).data).toEqual([]);
     expect((await outsider.from("attempts").select("id")).data).toEqual([]);
     const { error } = await outsider.from("problems").insert({
       household_id: householdId, source: "pasted", statement: "x".repeat(20), answer: "A", difficulty: 1, technique_tags: ["casework"],
     });
     expect(error).not.toBeNull();
-  });
-
-  it("the student cannot change household settings", async () => {
-    await student.from("households").update({ timezone: "UTC" }).eq("id", householdId);
+    await outsider.from("households").update({ timezone: "UTC" }).eq("id", householdId);
     const { data } = await admin.from("households").select("timezone").eq("id", householdId).single();
     expect(data!.timezone).toBe("America/Los_Angeles");
   });
 
-  it("a parent cannot log attempts for the student", async () => {
-    const { error } = await parent.from("attempts").insert({
-      household_id: householdId, student_id: studentId, problem_id: problemId, context: "trainer",
-      local_date: "2026-11-12", seconds: 1, correct: true,
-    });
+  it("the owner can update their own settings", async () => {
+    const { error } = await user.from("households").update({ amc_date: "2027-03-04" }).eq("id", householdId);
+    expect(error).toBeNull();
+  });
+
+  it("a user cannot move their profile to another household or change anything but the name", async () => {
+    const { data: other } = await outsider.from("profiles").select("household_id").limit(1).single();
+    const { error } = await user.from("profiles").update({ household_id: other!.household_id }).eq("id", userId);
     expect(error).not.toBeNull();
   });
 
-  it("the student cannot delete problems", async () => {
-    await student.from("problems").delete().eq("id", problemId);
-    const { data } = await admin.from("problems").select("id").eq("id", problemId);
-    expect(data).toHaveLength(1);
+  it("the public cannot call the internal provisioning function", async () => {
+    const { error } = await user.rpc("provision_account", { p_user: userId, p_email: "x@y.z", p_meta: {} });
+    expect(error).not.toBeNull();
   });
 
   it("schema rejects AoPS problem text and generated problems in the vault", async () => {
@@ -81,5 +100,6 @@ describe.skipIf(!local)("RLS", () => {
       technique_tags: ["casework"], status: "vault",
     });
     expect(genVault.error?.message).toMatch(/generated_not_vault/);
+    expect(problemId).toBeTruthy();
   });
 });
