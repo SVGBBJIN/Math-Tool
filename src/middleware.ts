@@ -10,10 +10,21 @@ export async function middleware(request: NextRequest) {
   // Guest mode keeps everything in the browser: no session, so don't touch Supabase at all.
   if (path === GUEST_PREFIX || path.startsWith(`${GUEST_PREFIX}/`)) return NextResponse.next({ request });
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  // Without Supabase config (e.g. env vars missing on the host) the middleware must not throw,
+  // or the whole site shows "Routing Middleware ... failed". Fall back to guest mode.
+  if (!supabaseUrl || !supabaseKey) {
+    if (PUBLIC_PATHS.some((p) => path.startsWith(p))) return NextResponse.next({ request });
+    const url = request.nextUrl.clone();
+    url.pathname = GUEST_PREFIX;
+    return NextResponse.redirect(url);
+  }
+
   let response = NextResponse.next({ request });
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    supabaseUrl,
+    supabaseKey,
     {
       cookies: {
         getAll: () => request.cookies.getAll(),
@@ -25,9 +36,14 @@ export async function middleware(request: NextRequest) {
       },
     },
   );
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    ({
+      data: { user },
+    } = await supabase.auth.getUser());
+  } catch {
+    // Supabase unreachable: treat as signed out rather than crashing the middleware.
+  }
 
   if (!user && !PUBLIC_PATHS.some((p) => path.startsWith(p))) {
     const url = request.nextUrl.clone();
