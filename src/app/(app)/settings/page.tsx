@@ -8,13 +8,10 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-4">
       <h1 className="h1">Settings</h1>
-      {!isParent && (
-        <p className="card text-sm text-muted">Settings are managed by your parent&apos;s account.</p>
-      )}
       <section className="card">
         <h2 className="h2">Dates &amp; time zone</h2>
         <HouseholdForm
-          disabled={!isParent}
+          disabled={false}
           timezone={ctx.household.timezone}
           amcDate={ctx.household.amc_date ?? ""}
           finalsStart={ctx.household.finals_start ?? ""}
