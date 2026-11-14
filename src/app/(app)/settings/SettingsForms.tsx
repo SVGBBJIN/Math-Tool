@@ -1,10 +1,18 @@
 "use client";
 import { useActionState } from "react";
-import { createStudent, updateSettings, type FormState } from "../../actions/account";
+import { createStudent, updateSettings as serverUpdate, type FormState } from "../../actions/account";
 import { FormMessage } from "@/components/FormMessage";
 
-export function HouseholdForm(props: { disabled: boolean; timezone: string; amcDate: string; finalsStart: string; finalsEnd: string }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(updateSettings, {});
+export function HouseholdForm(props: {
+  disabled: boolean;
+  timezone: string;
+  amcDate: string;
+  finalsStart: string;
+  finalsEnd: string;
+  /** Defaults to the signed-in server action; guest mode saves to the browser instead. */
+  action?: (prev: FormState, form: FormData) => Promise<FormState>;
+}) {
+  const [state, action, pending] = useActionState<FormState, FormData>(props.action ?? serverUpdate, {});
   return (
     <form action={action} className="mt-3 space-y-3">
       <fieldset disabled={props.disabled} className="space-y-3">

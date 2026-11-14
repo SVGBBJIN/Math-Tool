@@ -1,5 +1,6 @@
 "use client";
 import { useActionState, useState } from "react";
+import Link from "next/link";
 import { signIn, signUpParent, type FormState } from "../actions/account";
 import { FormMessage } from "@/components/FormMessage";
 
@@ -51,6 +52,11 @@ export function LoginForms() {
         <FormMessage state={signup ? upState : inState} />
       </form>
       {!signup && <p className="mt-3 text-xs text-muted">Students: use the login your parent created for you.</p>}
+      <div className="my-4 flex items-center gap-3 text-xs text-muted" aria-hidden>
+        <span className="h-px flex-1 bg-line" /> or <span className="h-px flex-1 bg-line" />
+      </div>
+      <Link href="/guest" className="btn-ghost w-full">Continue as guest</Link>
+      <p className="mt-2 text-xs text-muted">No account needed. Your progress is saved in this browser only.</p>
     </div>
   );
 }

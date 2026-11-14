@@ -1,16 +1,10 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays } from "./dates";
-import { evaluateDay, requiredItems, type ActivityRow, type DayStatus, type PlanItem } from "./plan";
+import { evaluateDay, khanRequiredOn, requiredItems, type ActivityRow, type DayStatus, type PlanItem } from "./plan";
 import { comfortLevel, pickTrainerProblems, type TagStat } from "./trainer";
 
 type DB = SupabaseClient;
-
-/** Khan requirement per date. M3 replaces this with configurable date ranges. */
-export function khanRequiredOn(_date: string): boolean {
-  void _date;
-  return false; // Khan tracking ships in M3; not required until then.
-}
 
 /** Cap on how many minutes one problem can contribute to the day (guards against a timer left running). */
 const MAX_MINUTES_PER_PROBLEM = 20;

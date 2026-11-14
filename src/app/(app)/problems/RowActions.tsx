@@ -1,8 +1,25 @@
 "use client";
 import { useTransition, useState } from "react";
-import { deleteProblem, setProblemStatus } from "../../actions/problems";
+import { deleteProblem as serverDelete, setProblemStatus as serverSetStatus } from "../../actions/problems";
 
-export function RowActions({ id, status, isParent }: { id: string; status: string; isParent: boolean }) {
+export interface RowActionHandlers {
+  setProblemStatus: (id: string, status: "train" | "vault" | "burned") => Promise<{ error?: string }>;
+  deleteProblem: (id: string) => Promise<{ error?: string }>;
+}
+const SERVER_ACTIONS: RowActionHandlers = { setProblemStatus: serverSetStatus, deleteProblem: serverDelete };
+
+export function RowActions({
+  id,
+  status,
+  isParent,
+  actions = SERVER_ACTIONS,
+}: {
+  id: string;
+  status: string;
+  isParent: boolean;
+  actions?: RowActionHandlers;
+}) {
+  const { setProblemStatus, deleteProblem } = actions;
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const run = (fn: () => Promise<{ error?: string }>) =>

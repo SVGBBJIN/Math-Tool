@@ -1,13 +1,22 @@
 "use client";
 import { useActionState, useState } from "react";
-import { addAopsProblem, addPastedProblem, importCsv } from "../../actions/problems";
+import { addAopsProblem as serverAops, addPastedProblem as serverPaste, importCsv as serverCsv } from "../../actions/problems";
 import type { FormState } from "../../actions/account";
 import { FormMessage } from "@/components/FormMessage";
 import { TECHNIQUES, TOPICS } from "@/lib/tags";
 
 type Tab = "aops" | "paste" | "csv";
 
-export function AddProblemForms({ isParent }: { isParent: boolean }) {
+type FormAction = (prev: FormState, form: FormData) => Promise<FormState>;
+export interface AddProblemActions {
+  addAopsProblem: FormAction;
+  addPastedProblem: FormAction;
+  importCsv: FormAction;
+}
+const SERVER_ACTIONS: AddProblemActions = { addAopsProblem: serverAops, addPastedProblem: serverPaste, importCsv: serverCsv };
+
+export function AddProblemForms({ isParent, actions = SERVER_ACTIONS }: { isParent: boolean; actions?: AddProblemActions }) {
+  const { addAopsProblem, addPastedProblem, importCsv } = actions;
   const [tab, setTab] = useState<Tab | null>(null);
   const [aopsState, aopsAction, aopsPending] = useActionState<FormState, FormData>(addAopsProblem, {});
   const [pasteState, pasteAction, pastePending] = useActionState<FormState, FormData>(addPastedProblem, {});

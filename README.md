@@ -53,6 +53,19 @@ npm test          # unit tests: plan/streak, spaced review, trainer selection
 npm run test:db   # row-level-security checks against the local Supabase (needs seed:demo)
 ```
 
+## Guest mode
+
+The sign-in screen has a **Continue as guest** button (`/guest`). Guests need no account and nothing touches Supabase:
+all progress lives in the browser's `localStorage` (`src/lib/guest`), and the middleware skips the auth check for `/guest`
+(it also sends a returning guest, remembered by the `amc_guest` cookie, back to `/guest` instead of the sign-in screen).
+
+- One person with full permissions: they train, log attempts, manage the problem bank (including sealing problems
+  in the vault) and edit dates. There is no parent/student split.
+- Starts with the 20 original sample problems. Same daily plan, trainer, spaced-review and streak rules as the signed-in app
+  (shared pure modules in `src/lib`; the guest engine is `src/lib/guest/engine.ts`, tested in `tests/guest.test.ts`).
+- Data is per browser: clearing site data or switching devices starts over. Settings has **Download / Restore backup**.
+- Guests can't get text reminders (they need an account).
+
 ## How M1 works
 
 - **Accounts.** A parent signs up and confirms they are the parent or guardian. They create the household, then

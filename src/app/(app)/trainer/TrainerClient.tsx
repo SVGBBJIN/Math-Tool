@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { finalizeAttempt, submitAttempt } from "../../actions/trainer";
+import { finalizeAttempt as serverFinalize, submitAttempt as serverSubmit } from "../../actions/trainer";
 import { ERROR_TYPES, label, type ErrorType } from "@/lib/tags";
 
 export interface TrainerProblem {
@@ -27,6 +27,13 @@ export interface TrainerProblem {
   };
 }
 
+/** Where attempts are saved. Defaults to the signed-in server actions; guest mode passes browser-local ones. */
+export interface TrainerActions {
+  submitAttempt: typeof serverSubmit;
+  finalizeAttempt: typeof serverFinalize;
+}
+const SERVER_ACTIONS: TrainerActions = { submitAttempt: serverSubmit, finalizeAttempt: serverFinalize };
+
 const LETTERS = ["A", "B", "C", "D", "E"] as const;
 
 /** Technique names are hints, so they are only revealed after the attempt. */
@@ -42,7 +49,18 @@ function fmt(sec: number) {
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
 }
 
-export function TrainerClient({ sessionId, problems: initial }: { sessionId: string; problems: TrainerProblem[] }) {
+export function TrainerClient({
+  sessionId,
+  problems: initial,
+  actions = SERVER_ACTIONS,
+  basePath = "",
+}: {
+  sessionId: string;
+  problems: TrainerProblem[];
+  actions?: TrainerActions;
+  /** Prefix for in-app links ("" for the signed-in app, "/guest" for guest mode). */
+  basePath?: string;
+}) {
   const [problems, setProblems] = useState(initial);
   const firstOpen = problems.findIndex((p) => !p.attempt?.finalized);
   const [index, setIndex] = useState(firstOpen === -1 ? problems.length : firstOpen);
@@ -56,7 +74,7 @@ export function TrainerClient({ sessionId, problems: initial }: { sessionId: str
         <p className="mt-1 text-muted">
           {problems.filter((p) => p.attempt?.correct).length} / {problems.length} correct. Misses will come back as twins.
         </p>
-        <Link href="/" className="btn mt-4">Back to today</Link>
+        <Link href={basePath || "/"} className="btn mt-4">Back to today</Link>
       </div>
     );
   }
@@ -78,6 +96,7 @@ export function TrainerClient({ sessionId, problems: initial }: { sessionId: str
       <ProblemCard
         key={problems[index].id}
         sessionId={sessionId}
+        actions={actions}
         problem={problems[index]}
         onAttempt={(a) => update(problems[index].id, a)}
         onNext={() => setIndex((i) => i + 1)}
@@ -109,11 +128,13 @@ function useStopwatch(key: string, running: boolean) {
 
 function ProblemCard({
   sessionId,
+  actions,
   problem,
   onAttempt,
   onNext,
 }: {
   sessionId: string;
+  actions: TrainerActions;
   problem: TrainerProblem;
   onAttempt: (a: TrainerProblem["attempt"]) => void;
   onNext: () => void;
@@ -135,7 +156,7 @@ function ProblemCard({
   const submit = () =>
     start(async () => {
       setError(null);
-      const res = await submitAttempt({
+      const res = await actions.submitAttempt({
         sessionId,
         problemId: problem.id,
         answer: answer ?? null,
@@ -163,7 +184,7 @@ function ProblemCard({
   const finalize = () =>
     start(async () => {
       setError(null);
-      const res = await finalizeAttempt({ attemptId: attempt!.id, keyIdea, errorType: attempt!.correct ? null : errorType });
+      const res = await actions.finalizeAttempt({ attemptId: attempt!.id, keyIdea, errorType: attempt!.correct ? null : errorType });
       if (!res.ok) return setError(res.error ?? "Could not save");
       onAttempt({ ...attempt!, finalized: true, keyIdea, errorType });
       onNext();

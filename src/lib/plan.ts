@@ -22,6 +22,12 @@ export interface PlanOptions {
   khanRequired: boolean;
 }
 
+/** Khan requirement per date. M3 replaces this with configurable date ranges. */
+export function khanRequiredOn(_date: string): boolean {
+  void _date;
+  return false; // Khan tracking ships in M3; not required until then.
+}
+
 export function requiredItems(date: string, opts: PlanOptions): PlanItem[] {
   const items: PlanItem[] = [];
   switch (weekday(date)) {

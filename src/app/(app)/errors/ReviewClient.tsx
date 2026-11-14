@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { markNothingToReview, reviewError } from "../../actions/errors";
+import { markNothingToReview as serverNothing, reviewError as serverReview } from "../../actions/errors";
 import { ERROR_TYPES } from "@/lib/tags";
 
 export interface MissRow {
@@ -17,16 +17,24 @@ export interface MissRow {
   takeaway: string | null;
 }
 
+export interface ReviewActions {
+  reviewError: (input: { attemptId: string; takeaway: string; minutes: number }) => Promise<{ error?: string }>;
+  markNothingToReview: () => Promise<{ error?: string }>;
+}
+const SERVER_ACTIONS: ReviewActions = { reviewError: serverReview, markNothingToReview: serverNothing };
+
 export function ReviewClient({
   pending,
   reviewedToday,
   target,
   isWednesday,
+  actions = SERVER_ACTIONS,
 }: {
   pending: MissRow[];
   reviewedToday: number;
   target: number;
   isWednesday: boolean;
+  actions?: ReviewActions;
 }) {
   const [open, setOpen] = useState(isWednesday);
   const [takeaway, setTakeaway] = useState("");
@@ -63,7 +71,7 @@ export function ReviewClient({
               className="btn mt-3"
               disabled={busy}
               onClick={() => start(async () => {
-                const r = await markNothingToReview();
+                const r = await actions.markNothingToReview();
                 if (r.error) setError(r.error);
               })}
             >
@@ -96,7 +104,7 @@ export function ReviewClient({
               start(async () => {
                 setError(null);
                 const minutes = Math.min(15, (Date.now() - since.current) / 60000);
-                const r = await reviewError({ attemptId: current.id, takeaway, minutes });
+                const r = await actions.reviewError({ attemptId: current.id, takeaway, minutes });
                 if (r.error) return setError(r.error);
                 setTakeaway("");
               })
