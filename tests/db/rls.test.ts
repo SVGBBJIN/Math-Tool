@@ -50,10 +50,19 @@ describe.skipIf(!local)("RLS", () => {
     expect(error).not.toBeNull();
   });
 
-  it("the student cannot change household settings", async () => {
-    await student.from("households").update({ timezone: "UTC" }).eq("id", householdId);
+  it("the student can change household settings (same as the parent)", async () => {
+    const { data: before } = await admin.from("households").select("timezone").eq("id", householdId).single();
+    const next = before!.timezone === "UTC" ? "America/Los_Angeles" : "UTC";
+    await student.from("households").update({ timezone: next }).eq("id", householdId);
     const { data } = await admin.from("households").select("timezone").eq("id", householdId).single();
-    expect(data!.timezone).toBe("America/Los_Angeles");
+    expect(data!.timezone).toBe(next);
+    await admin.from("households").update({ timezone: before!.timezone }).eq("id", householdId);
+  });
+
+  it("another household cannot change our settings", async () => {
+    await outsider.from("households").update({ timezone: "Pacific/Auckland" }).eq("id", householdId);
+    const { data } = await admin.from("households").select("timezone").eq("id", householdId).single();
+    expect(data!.timezone).not.toBe("Pacific/Auckland");
   });
 
   it("a parent cannot log attempts for the student", async () => {
@@ -64,10 +73,16 @@ describe.skipIf(!local)("RLS", () => {
     expect(error).not.toBeNull();
   });
 
-  it("the student cannot delete problems", async () => {
-    await student.from("problems").delete().eq("id", problemId);
-    const { data } = await admin.from("problems").select("id").eq("id", problemId);
-    expect(data).toHaveLength(1);
+  it("the student can delete problems; another household cannot", async () => {
+    const { data: row } = await admin
+      .from("problems")
+      .insert({ household_id: householdId, source: "pasted", statement: "throwaway problem for the delete test", choices: { A: "1", B: "2", C: "3", D: "4", E: "5" }, answer: "A", difficulty: 1, technique_tags: ["casework"] })
+      .select("id")
+      .single();
+    await outsider.from("problems").delete().eq("id", row!.id);
+    expect((await admin.from("problems").select("id").eq("id", row!.id)).data).toHaveLength(1);
+    await student.from("problems").delete().eq("id", row!.id);
+    expect((await admin.from("problems").select("id").eq("id", row!.id)).data).toHaveLength(0);
   });
 
   it("schema rejects AoPS problem text and generated problems in the vault", async () => {

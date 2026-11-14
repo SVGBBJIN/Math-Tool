@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireParent } from "@/lib/session";
+import { requireContext, requireParent } from "@/lib/session";
 
 export type FormState = { error?: string; message?: string };
 
@@ -115,7 +115,7 @@ const SettingsSchema = z.object({
 });
 
 export async function updateSettings(_: FormState, form: FormData): Promise<FormState> {
-  const ctx = await requireParent();
+  const ctx = await requireContext();
   const parsed = SettingsSchema.safeParse({
     timezone: form.get("timezone"),
     amcDate: form.get("amcDate") ?? "",

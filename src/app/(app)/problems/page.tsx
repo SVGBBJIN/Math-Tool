@@ -26,7 +26,8 @@ export default async function ProblemsPage({ searchParams }: { searchParams: Pro
   const { data: all } = await ctx.supabase.from("problems").select("status").eq("household_id", ctx.household.id);
   const counts = { train: 0, vault: 0, burned: 0 } as Record<string, number>;
   (all ?? []).forEach((p) => (counts[p.status] = (counts[p.status] ?? 0) + 1));
-  const isParent = ctx.profile.role === "parent";
+  // Parent and student accounts have the same bank permissions (seal, unseal, delete).
+  const isParent = true;
 
   return (
     <div className="space-y-4">

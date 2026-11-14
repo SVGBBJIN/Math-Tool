@@ -69,7 +69,7 @@ all progress lives in the browser's `localStorage` (`src/lib/guest`), and the mi
 ## How M1 works
 
 - **Accounts.** A parent signs up and confirms they are the parent or guardian. They create the household, then
-  create the student's login. The student never signs up on their own. Only the parent can change settings; only
+  create the student's login. The student never signs up on their own. Parent and student have the same management powers (settings, vault, delete problems); only
   the student can log attempts. Row-level security covers every table (`tests/db/rls.test.ts`).
 - **Daily plan.** Mon/Tue/Thu/Fri trainer · Wed error-log review · Sat timed block · Sun review of Saturday
   (`src/lib/plan.ts`). The streak survives if every required item is done **or** at least 10 minutes of plan work are

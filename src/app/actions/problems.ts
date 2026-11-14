@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { requireContext, requireParent } from "@/lib/session";
+import { requireContext } from "@/lib/session";
 import { parseAopsForm, parseCsv, parsePastedForm } from "@/lib/problem-input";
 import type { FormState } from "./account";
 
@@ -57,18 +57,13 @@ export async function importCsv(_: FormState, form: FormData): Promise<FormState
 
 export async function setProblemStatus(id: string, status: "train" | "vault" | "burned") {
   const ctx = await requireContext();
-  if (ctx.profile.role !== "parent") {
-    if (status === "vault") return { error: "Only a parent can seal problems into the vault" };
-    const { data: current } = await ctx.supabase.from("problems").select("status").eq("id", id).single();
-    if (current?.status === "vault") return { error: "Vault problems are unsealed only by endurance mode" };
-  }
   const { error } = await ctx.supabase.from("problems").update({ status }).eq("id", id);
   revalidatePath("/problems");
   return error ? { error: error.message } : {};
 }
 
 export async function deleteProblem(id: string) {
-  const ctx = await requireParent();
+  const ctx = await requireContext();
   const { error } = await ctx.supabase.from("problems").delete().eq("id", id).eq("household_id", ctx.household.id);
   revalidatePath("/problems");
   return error ? { error: error.message } : {};
