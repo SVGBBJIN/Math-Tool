@@ -1,7 +1,7 @@
 // Daily plan, completion and streak rules (pure functions).
 import { addDays, weekday } from "./dates";
 
-export type PlanItem = "trainer" | "error_review" | "timed_block" | "saturday_review" | "khan";
+export type PlanItem = "trainer" | "error_review" | "timed_block" | "saturday_review" | "khan" | "scroll";
 
 export const PLAN_LABELS: Record<PlanItem, string> = {
   trainer: "Trainer: 3 problems (~25 min)",
@@ -9,6 +9,7 @@ export const PLAN_LABELS: Record<PlanItem, string> = {
   timed_block: "Timed block",
   saturday_review: "Review Saturday's block",
   khan: "Khan Academy precalculus",
+  scroll: "Math scroll (optional)",
 };
 
 /** Minutes of any plan item that keep the streak alive on an otherwise incomplete day. */

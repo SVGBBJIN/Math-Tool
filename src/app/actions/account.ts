@@ -109,3 +109,13 @@ export async function updateSettings(_: FormState, form: FormData): Promise<Form
   revalidatePath("/", "layout");
   return { message: "Saved." };
 }
+
+/** Master switch for Sendblue text reminders. Independent of every practice mode. */
+export async function setTextReminders(_: FormState, form: FormData): Promise<FormState> {
+  const ctx = await requireContext();
+  const enabled = form.get("enabled") === "on";
+  const { error } = await ctx.supabase.from("households").update({ texts_enabled: enabled }).eq("id", ctx.household.id);
+  if (error) return { error: error.message };
+  revalidatePath("/settings");
+  return { message: enabled ? "Text reminders are on." : "Text reminders are off." };
+}

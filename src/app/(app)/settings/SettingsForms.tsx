@@ -1,6 +1,6 @@
 "use client";
 import { useActionState } from "react";
-import { updateSettings, type FormState } from "../../actions/account";
+import { setTextReminders, updateSettings, type FormState } from "../../actions/account";
 import { FormMessage } from "@/components/FormMessage";
 
 export function SettingsForm(props: { timezone: string; amcDate: string; finalsStart: string; finalsEnd: string }) {
@@ -28,6 +28,20 @@ export function SettingsForm(props: { timezone: string; amcDate: string; finalsS
         </div>
         <button className="btn w-full" disabled={pending}>Save</button>
       </div>
+      <FormMessage state={state} />
+    </form>
+  );
+}
+
+export function TextRemindersForm({ enabled }: { enabled: boolean }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(setTextReminders, {});
+  return (
+    <form action={action} className="mt-3 space-y-3">
+      <label className="flex min-h-11 items-center gap-3 text-base font-semibold">
+        <input type="checkbox" name="enabled" defaultChecked={enabled} className="h-5 w-5" />
+        Send text reminders (Sendblue)
+      </label>
+      <button className="btn w-full" disabled={pending}>Save</button>
       <FormMessage state={state} />
     </form>
   );
