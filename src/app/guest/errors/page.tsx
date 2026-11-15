@@ -55,7 +55,7 @@ export default function GuestErrors() {
   const shown = type ? rows.filter((r) => r.errorType === type) : rows;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 md:space-y-6">
       <section className="card">
         <h1 className="h2">Error log</h1>
         <p className="text-sm text-muted">

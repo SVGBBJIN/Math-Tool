@@ -30,7 +30,7 @@ export default async function ProblemsPage({ searchParams }: { searchParams: Pro
   const isParent = true;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 md:space-y-6">
       <section className="card">
         <h1 className="h2">Problem bank</h1>
         <p className="text-sm text-muted">AoPS problems are stored as links + metadata only. The vault stays sealed until endurance mode.</p>
@@ -47,7 +47,7 @@ export default async function ProblemsPage({ searchParams }: { searchParams: Pro
 
       <AddProblemForms isParent={isParent} />
 
-      <ul className="space-y-2">
+      <ul className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3">
         {(problems ?? []).length === 0 && <li className="card text-muted">No problems yet. Add some above.</li>}
         {(problems ?? []).map((p) => {
           const sealed = p.status === "vault";
@@ -64,7 +64,7 @@ export default async function ProblemsPage({ searchParams }: { searchParams: Pro
                 <span className={`chip ${STATUS_STYLE[p.status]}`}>{p.status}</span>
               </div>
               {sealed ? (
-                <p className="mt-2 text-xs text-muted">🔒 Sealed for a fresh timed test. Tags and answer hidden.</p>
+                <p className="mt-2 text-xs text-muted">Sealed for a fresh timed test. Tags and answer hidden.</p>
               ) : (
                 <div className="mt-2 flex flex-wrap items-center gap-1">
                   {p.technique_tags.map((t: string) => (

@@ -13,8 +13,8 @@ export function GuestShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div className="mx-auto min-h-dvh max-w-md px-4 pb-24">
-      <header className="flex items-center justify-between py-4">
+    <div className="shell">
+      <header className="shell-header">
         <div>
           <p className="text-lg font-extrabold tracking-tight text-brand">AMC Coach</p>
           <p className="text-xs text-muted">Guest · saved in this browser{state ? ` · ${state.settings.timezone}` : ""}</p>

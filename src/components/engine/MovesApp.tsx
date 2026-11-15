@@ -52,7 +52,7 @@ export function MovesApp({
   const settings = `${basePath}/settings`;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 md:space-y-6">
       <section className="card">
         <h1 className="h2">Moves</h1>
         <p className="text-sm text-muted">Solve by choosing the move. Every step is checked by computation.</p>
@@ -189,8 +189,7 @@ function Session({
     const mastered = mode.kind === "lesson" && skillState(latest.current, mode.skill).stage === "mastered";
     return (
       <div className="card text-center">
-        <p className="text-5xl" aria-hidden>{mastered ? "🏆" : "✅"}</p>
-        <h1 className="h1 mt-2">{mastered ? "Skill mastered" : mode.kind === "daily" ? "Set done" : mode.kind === "quick" ? "Quick reps done" : "That's it for now"}</h1>
+        <h1 className="h1">{mastered ? "Skill mastered" : mode.kind === "daily" ? "Set done" : mode.kind === "quick" ? "Quick reps done" : "That's it for now"}</h1>
         <p className="mt-1 text-muted">
           {tally.current.cards ? `${tally.current.passed} of ${tally.current.cards} passed cleanly. ` : ""}
           Anything missed comes back with new numbers after 1, 3 and 7 days.
