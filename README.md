@@ -168,6 +168,14 @@ Level 2 or 3 with no hints** (a twist never starts at Level 1, and dropping to L
 Skills have prerequisites. Three misses in a row re-show the worked example and park the skill for two days.
 Earlier skills are mixed into later sets.
 
+**Skip a concept by testing out.** Any open skill that isn't mastered has a **Test out** button. The test is two
+fresh problems the student has never seen (an easy rep and a twist), on an open workspace (Level 3), untimed and
+without support-level changes. Passing both under the usual bar (no hints, at most 2 steps snapped back) marks the
+skill as known ("Skipped: tested out") and unlocks what depends on it. The test stops at the first card that
+doesn't pass; there is no penalty (no mistake, no resurfacing, no wheel-spin count) and the lesson stays open.
+One attempt per skill per day. Test cards are logged with source `test` (`canTestOut`, `testOutSteps`,
+`finishTestOut` in `progress.ts`).
+
 Daily set: one review from the mistakes queue, one new concept, one stretch from the weakest topic. Missed ideas
 come back as fresh variants (never the same card) after 1, 3 and 7 days. Quick reps only draw from skills already
 worked in a lesson or daily set.

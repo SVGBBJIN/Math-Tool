@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { isTimed, pacing } from "@/lib/engine/config";
-import { emptyProgress, levelFor, markExampleSeen, nextLessonStep, recordCard, type CardOutcome, type EngineProgress, type Step } from "@/lib/engine/progress";
-import { getCard, moduleOf } from "@/lib/engine/registry";
+import {
+  availability, canTestOut, emptyProgress, finishTestOut, levelFor, markExampleSeen, nextLessonStep, recordCard, testOutSteps, type CardOutcome, type EngineProgress, type Step,
+} from "@/lib/engine/progress";
+import { getCard, moduleOf, skillOf } from "@/lib/engine/registry";
 import { failedStep } from "@/lib/engine/ui";
 
 const D1 = "2027-01-04";
@@ -111,5 +113,56 @@ describe("timing", () => {
   it("micro-session cards (quick reps, daily set) are timed; lessons are not", () => {
     for (const s of ["quick", "review", "new", "stretch"]) expect(isTimed(s)).toBe(true);
     expect(isTimed("lesson")).toBe(false);
+  });
+});
+
+describe("skip a concept by testing out", () => {
+  it("a test is a fresh easy rep and a fresh twist at Level 3, never a card already seen", () => {
+    let p = markExampleSeen(emptyProgress(), "quad.gcf", D1);
+    p = recordCard(p, outcome(nextLessonStep(p, "quad.gcf", PACE)!), D1).progress;
+    const steps = testOutSteps(p, "quad.gcf");
+    expect(steps.map((s) => [s.type, s.level, s.source])).toEqual([["rep", 3, "test"], ["twist", 3, "test"]]);
+    expect(new Set(steps.map((s) => s.cardId)).size).toBe(2);
+    for (const s of steps) expect(p.logs.some((l) => l.cardId === s.cardId)).toBe(false);
+  });
+  it("passing both cards marks the skill known and unlocks the next one", () => {
+    let p = emptyProgress();
+    expect(availability(p, skillOf("quad.dos")!, D1)).toBe("locked");
+    for (const step of testOutSteps(p, "quad.gcf")) {
+      const r = recordCard(p, outcome(step), D1);
+      expect(r.result).toBe("pass");
+      p = r.progress;
+    }
+    p = finishTestOut(p, "quad.gcf", true, D1);
+    expect(p.skills["quad.gcf"]).toMatchObject({ stage: "mastered", testedOut: true, masteredOn: D1 });
+    expect(availability(p, skillOf("quad.dos")!, D1)).toBe("open");
+    expect(p.logs.filter((l) => l.source === "test")).toHaveLength(2);
+  });
+  it("a hint or a miss fails the test with no penalty: no mistake, no queue, no wheel-spin count, lesson still open", () => {
+    let p = emptyProgress();
+    const [rep] = testOutSteps(p, "quad.gcf");
+    const hinted = recordCard(p, outcome(rep, { hintLevel: 1 }), D1);
+    expect(hinted.result).toBe("assisted");
+    const missed = recordCard(p, outcome(rep, { outcome: "not_sure" }), D1);
+    expect(missed.mistakeId).toBeNull();
+    p = finishTestOut(missed.progress, "quad.gcf", false, D1);
+    expect(p.mistakes).toHaveLength(0);
+    expect(p.queue).toHaveLength(0);
+    expect(p.skills["quad.gcf"]).toMatchObject({ stage: "new", failures: 0, testedOn: D1 });
+    expect(availability(p, skillOf("quad.gcf")!, D1)).toBe("open");
+    expect(nextLessonStep(p, "quad.gcf", PACE)!.example).toBe(true);
+  });
+  it("one attempt per skill per day, and only on open skills", () => {
+    let p = emptyProgress();
+    expect(canTestOut(p, skillOf("quad.gcf")!, D1)).toBe(true);
+    expect(canTestOut(p, skillOf("quad.dos")!, D1)).toBe(false); // locked
+    p = finishTestOut(p, "quad.gcf", false, D1);
+    expect(canTestOut(p, skillOf("quad.gcf")!, D1)).toBe(false);
+    expect(canTestOut(p, skillOf("quad.gcf")!, "2027-01-05")).toBe(true);
+    p = finishTestOut(p, "quad.gcf", true, "2027-01-05");
+    expect(canTestOut(p, skillOf("quad.gcf")!, "2027-01-06")).toBe(false); // mastered
+  });
+  it("tests are untimed", () => {
+    expect(isTimed("test")).toBe(false);
   });
 });

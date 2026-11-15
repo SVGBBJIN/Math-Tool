@@ -15,7 +15,7 @@ import type { Skill } from "./types";
 export const ENGINE_VERSION = 1;
 export type Level = 1 | 2 | 3;
 export type Stage = "new" | "reps" | "twist" | "mastered";
-export type Source = "lesson" | "review" | "new" | "stretch" | "quick";
+export type Source = "lesson" | "review" | "new" | "stretch" | "quick" | "test";
 export type Outcome = "solved" | "timeout" | "not_sure";
 /** pass = solved with mastery credit · assisted = solved with a hint or too many wrong moves */
 export type Result = "pass" | "assisted" | "timeout" | "not_sure";
@@ -36,6 +36,10 @@ export interface SkillProgress {
   seq: number;
   /** Support level the student ended the last card on (moves up after clean steps, down after errors). */
   level?: Level;
+  /** Last day a test-out was attempted (one attempt per skill per day). */
+  testedOn?: string | null;
+  /** Mastered by passing the test-out instead of working the lesson. */
+  testedOut?: boolean;
 }
 
 export interface QueueItem {
@@ -268,6 +272,7 @@ export function recordCard(p0: EngineProgress, o: CardOutcome, today: string, no
   const missed = o.outcome !== "solved";
   const events: EngineEvent[] = [];
   const sp = skillState(p0, skillId);
+  if (o.source === "test") return recordTestCard(p0, o, skillId, type, result, today, now);
 
   // Skill: lesson progress, mastery, wheel-spinning.
   const next: SkillProgress = {
@@ -357,6 +362,52 @@ export function recordCard(p0: EngineProgress, o: CardOutcome, today: string, no
     };
   }
   return { progress: p, result, mistakeId, events };
+}
+
+// ---- test out: skip a concept by passing a test --------------------------------------------
+/** Cards in a test-out: one fresh easy rep and one fresh twist, at Level 3, untimed. */
+export const TEST_OUT_LEVEL: Level = 3;
+
+/** A skill can be skipped by test while it is open (prerequisites done), not mastered, and not tried today. */
+export function canTestOut(p: EngineProgress, skill: Skill, today: string): boolean {
+  return availability(p, skill, today) === "open" && skillState(p, skill.id).testedOn !== today;
+}
+
+/** The test: fresh variants the student has never seen, so it can't be passed from memory. */
+export function testOutSteps(p: EngineProgress, skillId: string): Step[] {
+  const used = new Set<string>();
+  return (["rep", "twist"] as const).map((type) => {
+    const cardId = variant(p, skillId, type, used);
+    used.add(cardId);
+    return { skill: skillId, cardId, type, level: TEST_OUT_LEVEL, source: "test" as const, example: false };
+  });
+}
+
+/**
+ * A test card is a placement check, not practice: it is logged (card + steps) but touches no
+ * lesson progress, no mistakes queue and no wheel-spinning counter.
+ */
+function recordTestCard(p0: EngineProgress, o: CardOutcome, skillId: string, type: "rep" | "twist", result: Result, today: string, now: Date): Recorded {
+  const sp = skillState(p0, skillId);
+  let p = withSkill(p0, skillId, { testedOn: today, lastSeen: today, seq: sp.seq + 1 });
+  const log: CardLog = {
+    at: now.toISOString(), date: today, cardId: o.cardId, topic: topicOfSkill(skillId), skill: skillId, type, source: "test", level: o.level,
+    seconds: Math.round(o.seconds), wrongMoves: o.wrongMoves, hintLevel: o.hintLevel, result, skippedKeyMove: o.skippedKeyMove,
+  };
+  const stepLogs: StepLog[] = (o.steps ?? []).map((st, index) => ({
+    ...st, at: now.toISOString(), date: today, cardId: o.cardId, topic: topicOfSkill(skillId), skill: skillId, index, seconds: Math.round(st.seconds * 10) / 10,
+  }));
+  p = { ...p, logs: [...p.logs, log].slice(-MAX_LOGS), steps: [...(p.steps ?? []), ...stepLogs].slice(-MAX_STEP_LOGS) };
+  return { progress: p, result, mistakeId: null, events: [] };
+}
+
+/** Pass: the skill is mastered (tested out) and unlocks what depends on it. Fail: no penalty; the lesson stays open. */
+export function finishTestOut(p: EngineProgress, skillId: string, passed: boolean, today: string): EngineProgress {
+  const sp = skillState(p, skillId);
+  if (!passed) return withSkill(p, skillId, { testedOn: today });
+  return withSkill(p, skillId, {
+    stage: "mastered", masteredOn: today, testedOut: true, testedOn: today, introducedOn: sp.introducedOn ?? today, parkedUntil: null, reshow: false, failures: 0,
+  });
 }
 
 export function setMistakeDetails(p: EngineProgress, id: string, errorType: string, note: string): EngineProgress {

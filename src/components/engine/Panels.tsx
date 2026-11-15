@@ -69,9 +69,11 @@ const HEADLINE: Record<Result, string> = {
 
 /** Untimed and short: an animated replay of the shortest path, one line of insight, and (after a miss) what went wrong. */
 export function Reveal({
-  card, result, run, messages, isMistake, onNext,
+  card, result, run, messages, isMistake, onNext, practice = true,
 }: {
   card: Card; result: Result; run: RunResult; messages: string[]; isMistake: boolean;
+  /** False for a test-out card: nothing is scheduled to come back from it. */
+  practice?: boolean;
   onNext: (errorType: string | null, note: string) => void;
 }) {
   const [errorType, setErrorType] = useState<string | null>(result === "timeout" ? "out_of_time" : null);
@@ -85,7 +87,7 @@ export function Reveal({
         <p className={`font-bold ${good ? "text-mastery" : result === "assisted" ? "text-ink" : "text-danger"}`}>{HEADLINE[result]}</p>
         <p className="text-sm">Answer: <span className="font-bold"><LineMath card={card} line={moduleOf(card).answer(card)} /></span></p>
         <p className="text-xs text-muted">Time: {Math.round(run.seconds)}s</p>
-        {result === "assisted" && <p className="text-sm text-muted">No mastery credit this time. This idea will come back with new numbers.</p>}
+        {result === "assisted" && practice && <p className="text-sm text-muted">No mastery credit this time. This idea will come back with new numbers.</p>}
       </div>
 
       <div>
