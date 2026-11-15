@@ -131,7 +131,7 @@ export async function submitAttempt(input: z.input<typeof SubmitSchema>): Promis
 const FinalizeSchema = z.object({
   attemptId: z.uuid(),
   keyIdea: z.string().trim().min(5, "Write at least a short sentence").max(280, "Keep it to one sentence"),
-  errorType: z.enum(["concept_gap", "careless", "misread", "no_approach", "out_of_time"]).nullable(),
+  errorType: z.enum(["concept_gap", "careless", "misread", "no_approach", "out_of_time", "setup_error"]).nullable(),
 });
 
 export async function finalizeAttempt(input: z.input<typeof FinalizeSchema>): Promise<{ ok: boolean; error?: string; dayComplete?: boolean }> {

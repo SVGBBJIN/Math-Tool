@@ -1,0 +1,16 @@
+{
+  "_meta": {
+    "provisional": true,
+    "note": "PLACEHOLDER ESTIMATE, not measured. No real contest problems have been tagged yet. Replace it by running: node scripts/build-topic-distribution.mjs <your-tagged-bank.csv>. Only aggregate counts are stored here; never problem text, contest names, years or numbers.",
+    "problemsTagged": 0,
+    "generatedBy": "hand-entered placeholder"
+  },
+  "topics": {
+    "algebra": { "weight": 0.28, "byPosition": { "1-10": 0.34, "11-20": 0.27, "21-25": 0.2 } },
+    "counting_probability": { "weight": 0.22, "byPosition": { "1-10": 0.14, "11-20": 0.25, "21-25": 0.3 } },
+    "geometry": { "weight": 0.26, "byPosition": { "1-10": 0.26, "11-20": 0.26, "21-25": 0.26 } },
+    "number_theory": { "weight": 0.18, "byPosition": { "1-10": 0.16, "11-20": 0.18, "21-25": 0.22 } },
+    "logic_misc": { "weight": 0.06, "byPosition": { "1-10": 0.1, "11-20": 0.04, "21-25": 0.02 } }
+  },
+  "techniques": {}
+}

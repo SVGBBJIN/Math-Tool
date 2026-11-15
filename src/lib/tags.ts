@@ -45,10 +45,12 @@ export const TECHNIQUES = [
 
 export const ERROR_TYPES = [
   { value: "concept_gap", label: "Concept gap" },
-  { value: "careless", label: "Careless" },
+  { value: "no_approach", label: "Didn't see the approach" },
+  { value: "setup_error", label: "Setup error" },
+  // Stored as "careless" since M1; shown as an arithmetic slip.
+  { value: "careless", label: "Arithmetic slip" },
   { value: "misread", label: "Misread" },
-  { value: "no_approach", label: "No approach" },
-  { value: "out_of_time", label: "Out of time" },
+  { value: "out_of_time", label: "Ran out of time" },
 ] as const;
 
 export type ErrorType = (typeof ERROR_TYPES)[number]["value"];

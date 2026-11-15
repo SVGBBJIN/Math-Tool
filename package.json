@@ -4,13 +4,16 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "verify:cards": "vitest run tests/verify-cards.test.ts --disable-console-intercept",
+    "prebuild": "npm run verify:cards",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run tests/*.test.ts",
     "test:db": "node --env-file=.env.local ./node_modules/vitest/vitest.mjs run tests/db",
     "typecheck": "tsc --noEmit",
-    "seed:demo": "node --env-file=.env.local scripts/seed-demo.mjs"
+    "seed:demo": "node --env-file=.env.local scripts/seed-demo.mjs",
+    "topics:build": "node scripts/build-topic-distribution.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

@@ -4,6 +4,8 @@ import { useGuest } from "@/lib/guest/GuestProvider";
 import { dayStatus, keptMap } from "@/lib/guest/engine";
 import { PLAN_LABELS, currentStreak, type PlanItem } from "@/lib/plan";
 import { addDays, daysBetween, weekday } from "@/lib/dates";
+import { dailyStatus, emptyProgress, minutesOn } from "@/lib/engine/progress";
+import { MovesTodayCard } from "@/components/engine/MovesTodayCard";
 
 const ITEM_LINKS: Partial<Record<PlanItem, string>> = {
   trainer: "/guest/trainer",
@@ -29,6 +31,8 @@ export default function GuestToday() {
   const start = addDays(today, -weekday(today) - 28);
   const cells = Array.from({ length: 35 }, (_, i) => addDays(start, i));
   const pct = status.required.length ? Math.round((status.done.length / status.required.length) * 100) : 100;
+  const engine = state.engine ?? emptyProgress();
+  const moves = dailyStatus(engine, today);
 
   return (
     <div className="space-y-4">
@@ -89,6 +93,8 @@ export default function GuestToday() {
           {status.complete ? "All done for today. 🎉" : `${Math.round(status.totalMinutes)} min logged today.`}
         </p>
       </section>
+
+      <MovesTodayCard href="/guest/moves" done={moves.done} total={moves.total} minutes={minutesOn(engine, today)} />
 
       <section className="card">
         <h2 className="h2">Last 5 weeks</h2>
