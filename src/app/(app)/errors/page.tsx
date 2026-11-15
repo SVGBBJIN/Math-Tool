@@ -57,7 +57,7 @@ export default async function ErrorsPage({ searchParams }: { searchParams: Promi
   const isWednesday = weekday(ctx.today) === 3;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 md:space-y-6">
       <section className="card">
         <h1 className="h2">Error log</h1>
         <p className="text-sm text-muted">

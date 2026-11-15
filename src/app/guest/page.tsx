@@ -35,7 +35,7 @@ export default function GuestToday() {
   const moves = dailyStatus(engine, today);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 md:space-y-6">
       <section className="grid grid-cols-2 gap-3">
         <div className="card">
           <p className="text-sm font-semibold text-muted">Streak</p>
@@ -90,7 +90,7 @@ export default function GuestToday() {
           })}
         </ul>
         <p className="mt-3 text-xs text-muted">
-          {status.complete ? "All done for today. 🎉" : `${Math.round(status.totalMinutes)} min logged today.`}
+          {status.complete ? "All done for today." : `${Math.round(status.totalMinutes)} min logged today.`}
         </p>
       </section>
 

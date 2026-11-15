@@ -41,7 +41,7 @@ export default function GuestSettings() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 md:space-y-6">
       <h1 className="h1">Settings</h1>
       <section className="card">
         <h2 className="h2">Dates &amp; time zone</h2>

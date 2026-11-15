@@ -69,8 +69,7 @@ export function TrainerClient({
   if (index >= problems.length) {
     return (
       <div className="card text-center">
-        <p className="text-5xl" aria-hidden>🎉</p>
-        <h1 className="h1 mt-2">Trainer done</h1>
+        <h1 className="h1">Trainer done</h1>
         <p className="mt-1 text-muted">
           {problems.filter((p) => p.attempt?.correct).length} / {problems.length} correct. Misses will come back as twins.
         </p>
