@@ -15,6 +15,8 @@ import {
 import { applyMiss, applyTwinOutcome, primaryTechnique } from "../review";
 import { comfortLevel, pickTrainerProblems, type TagStat } from "../trainer";
 import type { ProblemInput, ProblemStatus } from "../problem-input";
+import { dailyStatus, isEngineProgress, minutesOn, setMistakeTakeaway, unreviewedMistakes, type EngineProgress } from "../engine/progress";
+import { ENGINE_MISS_PREFIX } from "../engine/mistakes";
 
 export const GUEST_STATE_VERSION = 1;
 const MAX_MINUTES_PER_PROBLEM = 20;
@@ -88,6 +90,8 @@ export interface GuestState {
   reviewItems: GuestReviewItem[];
   errorReviews: GuestErrorReview[];
   activity: GuestActivity[];
+  /** Move-based practice engine progress. Optional so older saves and backups still load. */
+  engine?: EngineProgress;
 }
 
 export function uid(): string {
@@ -358,12 +362,22 @@ export function reviewError(s: GuestState, input: { attemptId: string; takeaway:
   const takeaway = input.takeaway.trim();
   if (takeaway.length < 5) return { error: "Write what you'll do differently" };
   if (takeaway.length > 500) return { error: "Keep it under 500 characters" };
-  if (s.errorReviews.some((r) => r.attempt_id === input.attemptId)) return { error: "Already reviewed" };
-  if (!s.attempts.some((a) => a.id === input.attemptId)) return { error: "Attempt not found" };
-  s.errorReviews.push({ attempt_id: input.attemptId, takeaway, local_date: today });
+  if (input.attemptId.startsWith(ENGINE_MISS_PREFIX)) {
+    // A miss from the move-based engine: the takeaway lives on the engine's own mistake record.
+    const id = input.attemptId.slice(ENGINE_MISS_PREFIX.length);
+    const miss = s.engine?.mistakes.find((m) => m.id === id);
+    if (!s.engine || !miss) return { error: "Attempt not found" };
+    if (miss.takeaway) return { error: "Already reviewed" };
+    s.engine = setMistakeTakeaway(s.engine, id, takeaway, today);
+  } else {
+    if (s.errorReviews.some((r) => r.attempt_id === input.attemptId)) return { error: "Already reviewed" };
+    if (!s.attempts.some((a) => a.id === input.attemptId)) return { error: "Attempt not found" };
+    s.errorReviews.push({ attempt_id: input.attemptId, takeaway, local_date: today });
+  }
 
-  const reviewedToday = s.errorReviews.filter((r) => r.local_date === today).length;
-  const remaining = pendingMisses(s).length;
+  const engine = s.engine?.mistakes ?? [];
+  const reviewedToday = s.errorReviews.filter((r) => r.local_date === today).length + engine.filter((m) => m.reviewedOn === today).length;
+  const remaining = pendingMisses(s).length + engine.filter((m) => !m.takeaway).length;
   const done = reviewedToday >= ERROR_REVIEW_TARGET || (reviewedToday > 0 && remaining === 0);
   const current = s.activity.find((a) => a.local_date === today && a.item === "error_review")?.minutes ?? 0;
   const minutes = Math.max(0, Math.min(30, input.minutes));
@@ -373,9 +387,19 @@ export function reviewError(s: GuestState, input: { attemptId: string; takeaway:
 
 /** When the error log is empty there is nothing to review; mark it done. */
 export function markNothingToReview(s: GuestState, today: string): { error?: string } {
-  if (pendingMisses(s).length) return { error: "There are still misses to review" };
+  if (pendingMisses(s).length || (s.engine && unreviewedMistakes(s.engine).length)) return { error: "There are still misses to review" };
   upsertActivity(s, today, "error_review", 0, true);
   return {};
+}
+
+// ---------- move-based practice engine ----------
+
+/** Store the engine's progress and mirror today's engine work into the day's activity. */
+export function saveEngine(s: GuestState, progress: EngineProgress, today: string) {
+  s.engine = progress;
+  const minutes = minutesOn(progress, today);
+  const set = dailyStatus(progress, today);
+  if (minutes > 0 || set.done > 0) upsertActivity(s, today, "moves", minutes, set.complete);
 }
 
 // ---------- problem bank ----------
@@ -440,6 +464,7 @@ export function isGuestState(x: unknown): x is GuestState {
     typeof o.settings === "object" &&
     o.settings !== null &&
     typeof (o.settings as Record<string, unknown>).timezone === "string" &&
-    ["problems", "sessions", "attempts", "reviewItems", "errorReviews", "activity"].every((k) => Array.isArray(o[k]))
+    ["problems", "sessions", "attempts", "reviewItems", "errorReviews", "activity"].every((k) => Array.isArray(o[k])) &&
+    (o.engine === undefined || isEngineProgress(o.engine))
   );
 }

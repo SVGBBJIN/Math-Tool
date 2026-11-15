@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays } from "./dates";
 import { evaluateDay, khanRequiredOn, requiredItems, type ActivityRow, type DayStatus, type PlanItem } from "./plan";
 import { comfortLevel, pickTrainerProblems, type TagStat } from "./trainer";
+import { emptyProgress, isEngineProgress, type EngineProgress } from "./engine/progress";
 
 type DB = SupabaseClient;
 
@@ -176,4 +177,17 @@ export async function refreshTrainerActivity(
     await db.from("trainer_sessions").update({ completed_at: new Date().toISOString() }).eq("id", session.id).is("completed_at", null);
   }
   return completed;
+}
+
+/** The student's move-based engine progress (one JSON document), or a fresh one. */
+export async function loadEngineProgress(db: DB, studentId: string): Promise<EngineProgress> {
+  const { data } = await db.from("engine_progress").select("state").eq("student_id", studentId).maybeSingle();
+  return data && isEngineProgress(data.state) ? data.state : emptyProgress();
+}
+
+export async function saveEngineProgressRow(db: DB, householdId: string, studentId: string, state: EngineProgress) {
+  const { error } = await db
+    .from("engine_progress")
+    .upsert({ student_id: studentId, household_id: householdId, state, updated_at: new Date().toISOString() }, { onConflict: "student_id" });
+  if (error) throw new Error(error.message);
 }

@@ -15,6 +15,8 @@ export interface MissRow {
   link: string | null;
   tags: string[];
   takeaway: string | null;
+  /** Time taken, when known (move-based practice cards). */
+  seconds?: number;
 }
 
 export interface ReviewActions {
@@ -84,7 +86,8 @@ export function ReviewClient({
           <div className="rounded-xl bg-canvas p-3">
             <p className="font-semibold">{current.title}</p>
             <p className="text-xs text-muted">
-              {current.date} · {ERROR_TYPES.find((e) => e.value === current.errorType)?.label} · you: {current.yourAnswer ?? "blank"} · answer: {current.correctAnswer}
+              {current.date} · {ERROR_TYPES.find((e) => e.value === current.errorType)?.label ?? "Unclassified"} · you: {current.yourAnswer ?? "blank"} · answer: {current.correctAnswer}
+              {current.seconds !== undefined && ` · ${current.seconds}s`}
             </p>
             <p className="mt-2 text-sm"><span className="font-semibold">Your key idea:</span> {current.keyIdea}</p>
             {current.link && (

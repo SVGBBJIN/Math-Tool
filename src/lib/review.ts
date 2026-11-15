@@ -25,26 +25,31 @@ export function applyTwinOutcome(
   item: ReviewItemState,
   outcome: AttemptOutcome,
   today: string,
+  intervals: readonly number[] = REVIEW_INTERVALS,
 ): ReviewItemState {
   if (item.status !== "pending") return item;
   if (outcome.familiar) return item; // not a cold solve: no change, still due
   if (!outcome.correct) {
-    return { stage: 0, dueDate: addDays(today, REVIEW_INTERVALS[0]), status: "pending" };
+    return { stage: 0, dueDate: addDays(today, intervals[0]), status: "pending" };
   }
   const next = item.stage + 1;
-  if (next >= REVIEW_INTERVALS.length) {
+  if (next >= intervals.length) {
     return { ...item, status: "retired" };
   }
-  return { stage: next, dueDate: addDays(today, REVIEW_INTERVALS[next]), status: "pending" };
+  return { stage: next, dueDate: addDays(today, intervals[next]), status: "pending" };
 }
 
 /**
  * Transition for a miss on a non-twin problem: create a pending item for the tag,
  * or reset the existing pending one.
  */
-export function applyMiss(existing: ReviewItemState | null, today: string): ReviewItemState {
+export function applyMiss(
+  existing: ReviewItemState | null,
+  today: string,
+  intervals: readonly number[] = REVIEW_INTERVALS,
+): ReviewItemState {
   void existing; // either way the result is a fresh stage-0 item
-  return { stage: 0, dueDate: addDays(today, REVIEW_INTERVALS[0]), status: "pending" };
+  return { stage: 0, dueDate: addDays(today, intervals[0]), status: "pending" };
 }
 
 export function primaryTechnique(techniqueTags: string[]): string | null {

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { householdStudent, requireContext } from "@/lib/session";
-import { getDayStatus, getKeptMap } from "@/lib/data";
+import { getDayStatus, getKeptMap, loadEngineProgress } from "@/lib/data";
+import { dailyStatus, minutesOn } from "@/lib/engine/progress";
+import { MovesTodayCard } from "@/components/engine/MovesTodayCard";
 import { PLAN_LABELS, currentStreak, type PlanItem } from "@/lib/plan";
 import { addDays, daysBetween, weekday } from "@/lib/dates";
 
@@ -28,10 +30,12 @@ export default async function TodayPage() {
   }
 
   const { today, household } = ctx;
-  const [status, kept] = await Promise.all([
+  const [status, kept, engine] = await Promise.all([
     getDayStatus(ctx.supabase, student.id, today),
     getKeptMap(ctx.supabase, student.id, today, 70),
+    loadEngineProgress(ctx.supabase, student.id),
   ]);
+  const moves = dailyStatus(engine, today);
   const streak = currentStreak(kept, today);
   const amcDays = household.amc_date ? daysBetween(today, household.amc_date) : null;
 
@@ -102,6 +106,8 @@ export default async function TodayPage() {
             : `${Math.round(status.totalMinutes)} min logged today. Finish the list to stop reminders.`}
         </p>
       </section>
+
+      <MovesTodayCard href="/moves" done={moves.done} total={moves.total} minutes={minutesOn(engine, today)} canStart={ctx.profile.role === "student"} />
 
       <section className="card">
         <h2 className="h2">Last 5 weeks</h2>
