@@ -7,11 +7,6 @@ import { fromPoly, toPoly } from "../expr/poly";
 import type { ExprCard, ExprGoal } from "../expr/module";
 import type { CardType, MoveInput, Skill, TopicPack } from "../types";
 
-const MOVES = [
-  "gcf", "diff_squares", "trinomial", "split_middle", "group", "perfect_square", "expand", "complete_square",
-  "add_subtract", "substitute", "back_substitute", "to_zero", "add_both", "div_both", "zero_product", "sqrt_both", "solve_linear",
-];
-
 const m = (move: string, params?: Record<string, string | number>, target?: MoveInput["target"]): MoveInput => ({
   move,
   ...(params ? { params: Object.fromEntries(Object.entries(params).map(([k, x]) => [k, String(x)])) } : {}),
@@ -64,7 +59,7 @@ function card(
 ): ExprCard {
   const t = TEXT[skill];
   return {
-    id, module: "expr", skill, type, prompt, start, goal, path, keyMoves, moves: MOVES,
+    id, module: "expr", skill, type, prompt, start, goal, path, keyMoves,
     insight: type === "twist" ? t.twistInsight : t.insight,
     nudge: type === "twist" ? t.twistNudge : t.nudge,
     ...extra,

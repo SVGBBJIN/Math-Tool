@@ -181,7 +181,7 @@ export function parseExpr(src: string): Expr {
 const sup = (n: number) => [...String(n)].map((c) => SUPER[Number(c)]).join("");
 
 /** Split a term into (isNegative, positive body) for "a − b" printing. */
-function splitSign(t: Expr): [boolean, Expr] {
+export function splitSign(t: Expr): [boolean, Expr] {
   if (t.k === "neg") return [true, t.arg];
   if (t.k === "num" && t.n < 0) return [true, num(-t.n, t.d)];
   if (t.k === "mul" && t.factors[0].k === "num" && t.factors[0].n < 0) {
@@ -301,5 +301,50 @@ export function replace(e: Expr, from: Expr, to: Expr): Expr {
     case "pow": return { k: "pow", base: replace(e.base, from, to), exp: e.exp };
     case "div": return { k: "div", num: replace(e.num, from, to), den: replace(e.den, from, to) };
     default: return e;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// LaTeX (for KaTeX). Mirrors `show`: same tree, same grouping, so what is rendered is
+// exactly what is checked. Each top-level term/factor is rendered separately by the UI.
+// ---------------------------------------------------------------------------
+export function toLatex(e: Expr): string {
+  switch (e.k) {
+    case "num":
+      return (e.n < 0 ? "-" : "") + (e.d === 1 ? String(Math.abs(e.n)) : `\\tfrac{${Math.abs(e.n)}}{${e.d}}`);
+    case "var":
+      return e.name;
+    case "neg":
+      return "-" + (e.arg.k === "add" || e.arg.k === "neg" || (e.arg.k === "num" && e.arg.n < 0) ? `\\left(${toLatex(e.arg)}\\right)` : toLatex(e.arg));
+    case "add":
+      return e.terms
+        .map((t, i) => {
+          const [minus, body] = splitSign(t);
+          const s = body.k === "add" ? `\\left(${toLatex(body)}\\right)` : toLatex(body);
+          return i === 0 ? (minus ? "-" : "") + s : (minus ? " - " : " + ") + s;
+        })
+        .join("");
+    case "mul": {
+      let sign = "";
+      let fs = e.factors;
+      if (fs[0].k === "num" && fs[0].d === 1 && Math.abs(fs[0].n) === 1 && fs.length > 1) {
+        if (fs[0].n < 0) sign = "-";
+        fs = fs.slice(1);
+      }
+      const parts = fs.map((f, i) => {
+        if (f.k === "add" || f.k === "div" || f.k === "neg") return `\\left(${toLatex(f)}\\right)`;
+        if (f.k === "num" && (f.d !== 1 || (f.n < 0 && i > 0))) return `\\left(${toLatex(f)}\\right)`;
+        return toLatex(f);
+      });
+      let out = parts[0];
+      for (let i = 1; i < parts.length; i++) out += (/^\d/.test(parts[i]) ? " \\cdot " : "") + parts[i];
+      return sign + out;
+    }
+    case "pow":
+      return (atomic(e.base) ? toLatex(e.base) : `\\left(${toLatex(e.base)}\\right)`) + `^{${e.exp}}`;
+    case "div":
+      return `\\frac{${toLatex(e.num)}}{${toLatex(e.den)}}`;
+    case "sqrt":
+      return `\\sqrt{${toLatex(e.arg)}}`;
   }
 }

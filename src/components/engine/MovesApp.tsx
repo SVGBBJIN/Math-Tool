@@ -4,9 +4,9 @@
 // student's progress document and a `save` function (browser for guests, Supabase otherwise).
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { pacing, timeBudget, type Pacing } from "@/lib/engine/config";
+import { isTimed, MAX_WRONG_MOVES_FOR_CREDIT, pacing, timeBudget, type Pacing } from "@/lib/engine/config";
 import {
-  availability, dailyStatus, ensureDailySet, markExampleSeen, minutesOn, nextLessonStep, quickSteps, recordCard, setMistakeDetails, skillState,
+  availability, canTestOut, dailyStatus, ensureDailySet, finishTestOut, markExampleSeen, minutesOn, nextLessonStep, quickSteps, recordCard, setMistakeDetails, skillState, testOutSteps,
   type EngineEvent, type EngineProgress, type Level, type Result, type Step,
 } from "@/lib/engine/progress";
 import { PACKS, getCard, moduleOf, skillOf, type Card } from "@/lib/engine/registry";
@@ -14,9 +14,9 @@ import { problemText } from "@/lib/engine/ui";
 import { CardRunner, type RunResult } from "./CardRunner";
 import { Reveal, WorkedExample } from "./Panels";
 
-type Mode = { kind: "daily" } | { kind: "quick"; steps: Step[] } | { kind: "lesson"; skill: string };
+type Mode = { kind: "daily" } | { kind: "quick"; steps: Step[] } | { kind: "lesson"; skill: string } | { kind: "test"; skill: string; steps: Step[] };
 
-const SOURCE_LABEL: Record<Step["source"], string> = { review: "Review", new: "New concept", stretch: "Stretch", quick: "Quick rep", lesson: "Lesson" };
+const SOURCE_LABEL: Record<Step["source"], string> = { review: "Review", new: "New concept", stretch: "Stretch", quick: "Quick rep", lesson: "Lesson", test: "Test out" };
 const PHASE_TEXT: Record<Pacing["phase"], string> = {
   foundation: "building foundations",
   build: "building: less scaffolding",
@@ -55,7 +55,7 @@ export function MovesApp({
     <div className="space-y-4 md:space-y-6">
       <section className="card">
         <h1 className="h2">Moves</h1>
-        <p className="text-sm text-muted">Solve by choosing the move. Every step is checked by computation.</p>
+        <p className="text-sm text-muted">Solve on the workspace, step by step: drag the pieces, the app checks every step by computation. No paper needed.</p>
         <p className="mt-2 text-xs text-muted">
           {pace.daysLeft === null ? (
             <>Contest date not set, so pacing uses the gentlest ramp. <Link href={settings} className="font-semibold text-brand">Set it in Settings →</Link></>
@@ -118,7 +118,7 @@ export function MovesApp({
               </button>
             ))}
           </div>
-          <p className="mt-2 text-xs text-muted">1: pick from 4 moves · 2: all moves · 3: blank page, name the move first. Auto raises the level as you improve.</p>
+          <p className="mt-2 text-xs text-muted">1: the next step is highlighted and named · 2: you get only the goal of each step · 3: a blank workspace and the problem&apos;s goal. Auto moves up after clean steps and down after repeated errors.</p>
         </section>
       )}
 
@@ -129,22 +129,29 @@ export function MovesApp({
             {pack.skills.map((s) => {
               const sp = skillState(progress, s.id);
               const a = availability(progress, s, today);
+              const testable = !readOnly && canTestOut(progress, s, today);
               const status =
-                a === "mastered" ? "Mastered ✓"
+                a === "mastered" ? (sp.testedOut ? "Skipped: tested out ✓" : "Mastered ✓")
                 : a === "locked" ? `Locked: finish ${s.prereqs.filter((id) => ["new", "reps"].includes(skillState(progress, id).stage)).map((id) => skillOf(id)?.title).join(", ")}`
                 : a === "parked" ? `Parked until ${sp.parkedUntil}: we'll come back to it`
                 : sp.stage === "twist" ? "Easy reps done · twist next"
                 : sp.stage === "reps" ? `Easy reps ${sp.reps} / 3`
                 : "New";
+              const retryNote = a === "open" && sp.testedOn === today ? " · test out again tomorrow" : "";
               return (
                 <li key={s.id} className={`flex items-center gap-3 rounded-xl border p-3 ${a === "mastered" ? "border-mastery/40 bg-mastery/5" : a === "locked" ? "border-line opacity-60" : "border-line"}`}>
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold">{s.title}</p>
                     <p className="text-xs text-muted">{s.blurb}</p>
-                    <p className={`text-xs font-semibold ${a === "mastered" ? "text-mastery" : a === "parked" ? "text-familiar" : "text-muted"}`}>{status}</p>
+                    <p className={`text-xs font-semibold ${a === "mastered" ? "text-mastery" : a === "parked" ? "text-familiar" : "text-muted"}`}>{status}{retryNote}</p>
                   </div>
                   {!readOnly && a === "open" && (
-                    <button type="button" className="btn-ghost shrink-0 text-sm" onClick={() => setMode({ kind: "lesson", skill: s.id })}>{sp.stage === "new" ? "Learn" : "Continue"}</button>
+                    <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
+                      <button type="button" className="btn-ghost text-sm" onClick={() => setMode({ kind: "lesson", skill: s.id })}>{sp.stage === "new" ? "Learn" : "Continue"}</button>
+                      {testable && (
+                        <button type="button" className="btn-ghost text-sm" onClick={() => setMode({ kind: "test", skill: s.id, steps: testOutSteps(latest.current, s.id) })}>Test out</button>
+                      )}
+                    </div>
                   )}
                 </li>
               );
@@ -158,6 +165,7 @@ export function MovesApp({
 
 // ---------------------------------------------------------------------------------------
 type Phase =
+  | { at: "intro" }
   | { at: "example"; step: Step }
   | { at: "card"; step: Step }
   | { at: "reveal"; step: Step; card: Card; run: RunResult; result: Result; mistakeId: string | null; events: EngineEvent[] }
@@ -171,21 +179,59 @@ function Session({
 }) {
   const index = useRef(0);
   const tally = useRef({ cards: 0, passed: 0 });
+  /** Test out: set once a test card isn't passed; the test then stops. */
+  const testFailed = useRef(false);
 
   const nextStep = useCallback((): Step | null => {
     const p = latest.current;
     if (mode.kind === "daily") return (p.daily?.date === today ? p.daily.slots.find((s) => !s.done) : null) ?? null;
     if (mode.kind === "quick") return mode.steps[index.current] ?? null;
+    if (mode.kind === "test") return testFailed.current ? null : (mode.steps[index.current] ?? null);
     const skill = skillOf(mode.skill);
     return skill && availability(p, skill, today) === "open" ? nextLessonStep(p, mode.skill, pace) : null;
   }, [latest, mode, pace, today]);
 
   const enter = (step: Step | null): Phase => (!step ? { at: "done" } : step.example ? { at: "example", step } : { at: "card", step });
-  const [phase, setPhase] = useState<Phase>(() => enter(nextStep()));
+  const [phase, setPhase] = useState<Phase>(() => (mode.kind === "test" ? { at: "intro" } : enter(nextStep())));
 
   const exit = <button type="button" className="text-sm font-semibold text-muted" onClick={onExit}>← Back to Moves</button>;
 
-  if (phase.at === "done") {
+  if (phase.at === "intro" && mode.kind === "test") {
+    const skill = skillOf(mode.skill)!;
+    return (
+      <div className="space-y-3">
+        {exit}
+        <article className="card space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-brand">Test out</p>
+          <h1 className="h2">Skip {skill.title}?</h1>
+          <p className="text-sm leading-relaxed">
+            Show you already know it: {mode.steps.length} new problems, an easy one and a twist, on an open workspace (Level 3) with no timer.
+            Solve both without hints and with at most {MAX_WRONG_MOVES_FOR_CREDIT} steps snapped back, and {skill.title} is marked as known and unlocks what comes next.
+          </p>
+          <p className="text-sm text-muted">If it doesn&apos;t go well, nothing is lost: the lesson stays open and nothing goes into your mistakes. You can test out again tomorrow.</p>
+          <button type="button" className="btn w-full" onClick={() => setPhase(enter(nextStep()))}>Start the test</button>
+        </article>
+      </div>
+    );
+  }
+
+  if (phase.at === "done" && mode.kind === "test") {
+    const passed = skillState(latest.current, mode.skill).testedOut === true;
+    const skill = skillOf(mode.skill)!;
+    return (
+      <div className="card text-center">
+        <h1 className="h1">{passed ? `${skill.title}: skipped` : "Not yet"}</h1>
+        <p className="mt-1 text-muted">
+          {passed
+            ? "You tested out. It counts as known and the next concepts are unlocked. It can still come back in quick reps."
+            : `The lesson for ${skill.title} is open. Work it from the worked example, or test out again tomorrow.`}
+        </p>
+        <button type="button" className="btn mt-4" onClick={onExit}>Back to Moves</button>
+      </div>
+    );
+  }
+
+  if (phase.at === "done" || phase.at === "intro") {
     const mastered = mode.kind === "lesson" && skillState(latest.current, mode.skill).stage === "mastered";
     return (
       <div className="card text-center">
@@ -243,17 +289,21 @@ function Session({
           card={card}
           level={step.level as Level}
           budget={timeBudget(card, pace)}
+          timed={isTimed(step.source)}
+          adaptive={latest.current.dial === 0 && step.source !== "test"}
           label={`${SOURCE_LABEL[step.source]}${card.type === "twist" ? " · twist" : ""}`}
           onFinish={(run) => {
             const rec = recordCard(latest.current, {
               cardId: card.id, source: step.source, level: step.level, seconds: run.seconds, wrongMoves: run.wrongMoves, hintLevel: run.hintLevel,
               outcome: run.outcome, skippedKeyMove: run.skippedKeyMove, problem: problemText(card), userAnswer: run.userAnswer,
               correctAnswer: moduleOf(card).answer(card), queueId: step.queueId,
+              steps: run.steps, failedStep: run.failedStep, workspace: run.workspace, endLevel: run.endLevel,
             }, today);
             commit(rec.progress);
             index.current++;
             tally.current.cards++;
             if (rec.result === "pass") tally.current.passed++;
+            if (step.source === "test" && rec.result !== "pass") testFailed.current = true;
             setPhase({ at: "reveal", step, card, run, result: rec.result, mistakeId: rec.mistakeId, events: rec.events });
           }}
         />
@@ -264,13 +314,24 @@ function Session({
   const messages = [
     ...(phase.events.includes("reps_done") ? ["Easy reps done. The twist is next: that's what earns mastery."] : []),
     ...(phase.events.includes("mastered") ? [`${skill.title}: mastered.`] : []),
+    ...(mode.kind === "test"
+      ? [phase.result === "pass"
+          ? (index.current < mode.steps.length ? `Test card ${index.current} of ${mode.steps.length} passed. One more.` : "Test passed.")
+          : "This one didn't pass, so the test stops here. No penalty: the lesson is open."]
+      : []),
   ];
   return (
     <div className="space-y-3">
       {exit}
-      <Reveal key={phase.card.id} card={phase.card} result={phase.result} run={phase.run} messages={messages} isMistake={!!phase.mistakeId} onNext={(errorType, note) => {
+      <Reveal key={phase.card.id} card={phase.card} result={phase.result} run={phase.run} messages={messages} isMistake={!!phase.mistakeId} practice={mode.kind !== "test"} onNext={(errorType, note) => {
         if (phase.mistakeId && errorType) commit(setMistakeDetails(latest.current, phase.mistakeId, errorType, note));
         if (phase.events.includes("parked")) return setPhase({ at: "parked", skill: step.skill });
+        if (mode.kind === "test") {
+          const next = nextStep();
+          // Test over: passed only if every card was passed.
+          if (!next) commit(finishTestOut(latest.current, mode.skill, !testFailed.current, today));
+          return setPhase(next ? { at: "card", step: next } : { at: "done" });
+        }
         setPhase(enter(nextStep()));
       }} />
     </div>

@@ -10,8 +10,21 @@ import { daysBetween } from "../dates";
  */
 export const CONTEST_DATE: string | null = process.env.NEXT_PUBLIC_CONTEST_DATE || null;
 
-/** Seconds for the timed decision step, per card type. A card's own `timeLimit` overrides it. */
+/**
+ * Seconds for the timed decision step, per card type. A card's own `timeLimit` overrides it.
+ * Only micro-session cards are timed (see TIMED_SOURCES), and only until the decision step
+ * (the card's key move, or its first step) locks in. The follow-through and the reveal are untimed.
+ */
 export const TIME_BUDGETS: Record<"rep" | "twist", number> = { rep: 30, twist: 60 };
+/** Micro-session sources: quick reps and the daily set. Lessons (walkthroughs) are untimed. */
+export const TIMED_SOURCES: readonly string[] = ["quick", "review", "new", "stretch"];
+export const isTimed = (source: string) => TIMED_SOURCES.includes(source);
+
+/** Support level moves up after this many clean steps in a row (no wrong move, no hint)... */
+export const LEVEL_UP_CLEAN_STEPS = 3;
+/** ...and down after this many rejected moves in a row. */
+export const LEVEL_DOWN_ERRORS = 2;
+export const MAX_STEP_LOGS = 8000;
 
 /** More rejected moves than this and a solved card earns no mastery credit. */
 export const MAX_WRONG_MOVES_FOR_CREDIT = 2;

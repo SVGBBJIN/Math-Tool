@@ -3,7 +3,7 @@
 // actually builds on a scaled-down version of the problem and compares that, outcome by
 // outcome, with a brute-force list of the valid outcomes. A mismatch therefore comes with
 // a concrete counterexample: an arrangement built twice, never built, or not allowed.
-import type { ApplyResult, CardBase, EngineModule, MoveDef, MoveOption } from "../types";
+import type { ApplyResult, CardBase, EngineModule, MoveDef } from "../types";
 
 /** Problem parameters. The scaled-down version uses the same template with a smaller pool. */
 export type P = Record<string, number | string>;
@@ -63,8 +63,11 @@ const slotOf = (t: StructTemplate, id: string) => {
   if (!s) throw new Error(`Unknown slot ${id}`);
   return s;
 };
-const divOf = (t: StructTemplate, id: string) => {
-  const d = t.divisors.find((x) => x.id === id);
+/** A divisor typed as a number that matches none of the template's symmetries: same number at every size. */
+const literal = (id: string): DivDef | null =>
+  id.startsWith("lit:") ? { id, label: () => `${id.slice(4)}`, value: () => Number(id.slice(4)) } : null;
+export const divOf = (t: StructTemplate, id: string) => {
+  const d = literal(id) ?? t.divisors.find((x) => x.id === id);
   if (!d) throw new Error(`Unknown divisor ${id}`);
   return d;
 };
@@ -122,7 +125,8 @@ export function showStruct(card: StructCard, s: StructState): string {
   return parts.join("") + (complete ? ` = ${structValue(card, s)}` : "");
 }
 
-export type CheckResult = { ok: true } | { ok: false; reason: string; detail: string[] };
+/** `part` (0-based) is the part of the structure responsible for a failure, for highlighting. */
+export type CheckResult = { ok: true } | { ok: false; reason: string; detail: string[]; part?: number };
 
 /** Compare what the structure builds on the scaled-down version with the brute-force list. */
 export function checkStructure(card: StructCard, s: StructState): CheckResult {
@@ -148,6 +152,7 @@ export function checkStructure(card: StructCard, s: StructState): CheckResult {
       if (m % d !== 0) {
         return {
           ok: false,
+          part: i,
           reason: `Dividing by ${term.div ? divOf(t, term.div).value(card.full) : d} assumes every outcome was built exactly that many times.`,
           detail: [`${where}: ${t.show(key, p)} was built ${m} time${m === 1 ? "" : "s"}, not ${d} (e.g. ${run.paths.get(key)!.join("  and  ")}).`],
         };
@@ -158,23 +163,24 @@ export function checkStructure(card: StructCard, s: StructState): CheckResult {
   }
 
   const valid = new Set(t.universe(p));
-  const fail = (reason: string, line: string): CheckResult => ({ ok: false, reason, detail: [`${where}: ${line}`] });
+  const fail = (reason: string, line: string, part?: number): CheckResult => ({ ok: false, reason, detail: [`${where}: ${line}`], part });
+  const firstPart = (key: string, sign: 1 | -1) => s.terms.findIndex((term) => term.sign === sign && runTerm(t, term, p).mult.has(key));
   for (const [key, c] of total) {
-    if (!valid.has(key) && c > 0) return fail("This counts something that isn't allowed.", `it counts ${t.show(key, p)}.`);
+    if (!valid.has(key) && c > 0) return fail("This counts something that isn't allowed.", `it counts ${t.show(key, p)}.`, firstPart(key, 1));
   }
   for (const [key, c] of total) {
     if (valid.has(key) && c > 1) {
       const by = builtBy.get(key) ?? [];
       const how = by.length > 1 ? `in part ${by[0].part} and again in part ${by[1].part}` : `as ${by[0]?.paths.join("  and as  ")}`;
-      return fail("Something is counted more than once.", `${t.show(key, p)} is counted ${c} times: ${how}.`);
+      return fail("Something is counted more than once.", `${t.show(key, p)} is counted ${c} times: ${how}.`, by.length > 1 ? by[1].part - 1 : (by[0]?.part ?? 1) - 1);
     }
   }
   for (const key of valid) {
     const c = total.get(key) ?? 0;
-    if (c < 1) return fail("Something valid is never counted.", `${t.show(key, p)} is missed.`);
+    if (c < 1) return fail("Something valid is never counted.", `${t.show(key, p)} is missed.`, firstPart(key, -1) >= 0 ? firstPart(key, -1) : undefined);
   }
   for (const [key, c] of total) {
-    if (c < 0) return fail("This subtracts something that was never counted.", `${t.show(key, p)} is subtracted without being counted first.`);
+    if (c < 0) return fail("This subtracts something that was never counted.", `${t.show(key, p)} is subtracted without being counted first.`, firstPart(key, -1));
   }
   const value = structValue(card, s);
   if (value !== card.answer) return { ok: false, reason: `This works for the smaller version but gives ${value} for the real one.`, detail: [] };
@@ -182,74 +188,138 @@ export function checkStructure(card: StructCard, s: StructState): CheckResult {
 }
 
 // ---- moves ------------------------------------------------------------------
+/**
+ * The standing Module B toolbox: operation tokens that join pieces. The pieces themselves
+ * (what a slot stands for, in words, never with its count) come from the problem, like the
+ * terms of an expression do in Module A.
+ */
 export const STRUCT_MOVES: MoveDef[] = [
-  { id: "slot", name: "Multiply: add a slot", aliases: ["multiply", "slot", "times", "multiplication principle", "next choice"], blurb: "One more independent choice.", params: [{ name: "slot", label: "Which choice?", kind: "choice" }] },
-  { id: "case", name: "Split into cases (add)", aliases: ["cases", "casework", "add", "new case"], blurb: "Start a separate case; cases are added.", params: [] },
-  { id: "subtract", name: "Subtract an overcount", aliases: ["subtract", "remove overcount", "take away"], blurb: "Start a part that is subtracted.", params: [] },
-  { id: "complement", name: "Complement: everything minus the ones you don't want", aliases: ["complement", "total minus", "at least one", "complementary counting"], blurb: "Count everything, then subtract the outcomes with none.", params: [] },
-  { id: "divide", name: "Divide by symmetry", aliases: ["divide", "symmetry", "unordered", "overcounted orders"], blurb: "Each outcome was built the same number of times.", params: [{ name: "div", label: "Divide by", kind: "choice" }] },
-  { id: "check", name: "Check the structure", blurb: "Verify against a brute-force count.", params: [] },
+  {
+    id: "slot", name: "× Multiply", group: "build", blurb: "Add a slot for one more independent choice; drop a piece into it and type how many options it has.",
+    params: [{ name: "slot", label: "Piece", kind: "term" }, { name: "count", label: "Options", kind: "int" }],
+    kind: "Add a slot for the next choice", goal: "Count the choices for the next position", why: "Independent choices in a row multiply.",
+  },
+  {
+    id: "case", name: "+ Case", group: "join", blurb: "Start a separate case. Cases are added, so they must not overlap.", params: [],
+    kind: "Split into cases", goal: "Break the count into separate situations", why: "Separate, non-overlapping cases add.",
+  },
+  {
+    id: "subtract", name: "− Overcount", group: "join", blurb: "Start a part that is subtracted: what was counted but shouldn't be.", params: [],
+    kind: "Subtract an overcount", goal: "Remove what was counted too often", why: "What was counted wrongly is taken away again.",
+  },
+  {
+    id: "complement", name: "− Complement", group: "join", blurb: "Everything, minus the ones you don't want.", params: [],
+    kind: "Count the complement", goal: "Count the opposite and take it away from everything", why: "Wanted = everything − unwanted.",
+  },
+  {
+    id: "divide", name: "÷ Symmetry", group: "join", blurb: "Divide a part by how many times it builds each outcome.", params: [{ name: "value", label: "Divide by", kind: "int" }],
+    kind: "Divide by symmetry", goal: "Fix the fact that each outcome was built several times", why: "If every outcome is built the same number of times, dividing gives each one once.",
+  },
+  {
+    id: "check", name: "Check", blurb: "Verify against a brute-force count.", params: [], gesture: true,
+    kind: "Check the structure", goal: "Check your structure", why: "The structure builds every valid outcome exactly once.",
+  },
 ];
+
+/** A count typed on the keypad: digits, ! and × (e.g. "24", "4!", "2×4!"). */
+export function parseCount(src: string): number | null {
+  const parts = src.replace(/\s/g, "").replace(/[x*·]/g, "×").split("×");
+  if (!parts.length || parts.some((x) => !/^\d+!?$/.test(x))) return null;
+  const fact = (n: number): number => (n <= 1 ? 1 : n * fact(n - 1));
+  const value = parts.reduce((prod, x) => prod * (x.endsWith("!") ? (Number(x.slice(0, -1)) <= 12 ? fact(Number(x.slice(0, -1))) : NaN) : Number(x)), 1);
+  return Number.isFinite(value) ? value : null;
+}
 
 const last = (s: StructState) => s.terms[s.terms.length - 1];
 
 export function applyStructMove(card: StructCard, s: StructState, move: string, params: Record<string, string> = {}): ApplyResult<StructState> {
   const t = template(card.template);
   const cur = last(s);
-  const startPart = (sign: 1 | -1): ApplyResult<StructState> => {
+  const startPart = (sign: 1 | -1, why: string): ApplyResult<StructState> => {
     if (!cur || !cur.slots.length) return { ok: false, reason: "Fill the current part first.", noop: true };
-    return { ok: true, state: { terms: [...s.terms, { sign, slots: [], div: null }] } };
+    return { ok: true, state: { terms: [...s.terms, { sign, slots: [], div: null }] }, why };
   };
   switch (move) {
     case "slot": {
-      if (!card.palette.includes(params.slot ?? "")) return { ok: false, reason: "Pick a slot.", noop: true };
-      slotOf(t, params.slot);
+      if (!card.palette.includes(params.slot ?? "")) return { ok: false, reason: "Drop a piece into the slot.", noop: true };
+      const slot = slotOf(t, params.slot);
+      const placed = cur?.slots.length ?? 0;
+      const actual = slot.count(card.full, placed);
+      // The count is the student's: it is checked here, never shown on the piece.
+      if (params.count !== undefined) {
+        const typed = parseCount(params.count);
+        if (typed === null) return { ok: false, reason: "Type a whole number (you can use ! and ×).", noop: true };
+        if (typed !== actual) {
+          const reason =
+            placed > 0 && typed === slot.count(card.full, 0) && actual !== typed
+              ? "That's how many there were at the start, but the earlier slots have used some up."
+              : typed > actual
+                ? `Too many: "${slot.label(card.full)}" doesn't leave ${typed} choices here.`
+                : `Too few: count every choice "${slot.label(card.full)}" still allows here.`;
+          return { ok: false, reason };
+        }
+      }
       const terms = cur ? [...s.terms.slice(0, -1), { ...cur, slots: [...cur.slots, params.slot] }] : [{ sign: 1 as const, slots: [params.slot], div: null }];
-      return { ok: true, state: { terms } };
+      const why = placed > 0 && actual < slot.count(card.full, 0) ? `${actual} options: the earlier slots used ${slot.count(card.full, 0) - actual} up.` : `${actual} options, independent of the other slots.`;
+      return { ok: true, state: { terms }, why };
     }
     case "case":
-      return startPart(1);
+      return startPart(1, "A new case: it is added to the others, so it must not overlap them.");
     case "subtract":
+      return startPart(-1, "A part that is taken away.");
     case "complement":
-      return startPart(-1);
+      return startPart(-1, "Now build the outcomes you don't want; they're subtracted from everything.");
     case "divide": {
-      if (!card.divs.includes(params.div ?? "")) return { ok: false, reason: "Pick what to divide by.", noop: true };
       if (!cur || !cur.slots.length) return { ok: false, reason: "Add the slots before dividing.", noop: true };
-      return { ok: true, state: { terms: [...s.terms.slice(0, -1), { ...cur, div: params.div }] } };
+      let id = params.div ?? "";
+      if (!id && params.value !== undefined) {
+        const v = parseCount(params.value);
+        if (v === null || v < 2) return { ok: false, reason: "Divide by a whole number bigger than 1.", noop: true };
+        id = card.divs.find((d) => divOf(t, d).value(card.full) === v) ?? `lit:${v}`;
+      }
+      if (!id || (!id.startsWith("lit:") && !card.divs.includes(id))) return { ok: false, reason: "Type what to divide by.", noop: true };
+      return { ok: true, state: { terms: [...s.terms.slice(0, -1), { ...cur, div: id }] }, why: "Divided: Check will test that every outcome really is built that many times." };
     }
     case "check": {
       const r = checkStructure(card, s);
-      return r.ok ? { ok: true, state: s, done: true } : r;
+      if (r.ok) return { ok: true, state: s, done: true, why: "Every valid outcome is counted exactly once." };
+      // A typed divisor can match two symmetries with the same value on the real problem.
+      // The student only typed a number, so any reading consistent with it counts.
+      for (const alt of divisorReadings(card, s)) if (checkStructure(card, alt).ok) return { ok: true, state: alt, done: true, why: "Every valid outcome is counted exactly once." };
+      return r;
     }
     default:
       return { ok: false, reason: "Unknown move." };
   }
 }
 
+/** Other structures the same typed divisors could stand for (same value on the real problem). */
+function divisorReadings(card: StructCard, s: StructState): StructState[] {
+  const t = template(card.template);
+  const options = s.terms.map((term) => {
+    if (!term.div) return [null];
+    const v = divOf(t, term.div).value(card.full);
+    return [...new Set([term.div, ...card.divs.filter((d) => divOf(t, d).value(card.full) === v)])];
+  });
+  let combos: (string | null)[][] = [[]];
+  for (const o of options) combos = combos.flatMap((c) => o.map((x) => [...c, x])).slice(0, 32);
+  return combos.slice(1).map((divs) => ({ terms: s.terms.map((term, i) => ({ ...term, div: divs[i] })) }));
+}
+
 export const structModule: EngineModule<StructState, StructCard> = {
   id: "struct",
   init: () => ({ terms: [] }),
-  options(card, state) {
-    const t = template(card.template);
-    const placed = last(state)?.slots.length ?? 0;
-    const out: MoveOption[] = card.palette.map((id) => {
-      const slot = slotOf(t, id);
-      return { key: `slot:${id}`, move: "slot", label: `× ${slot.count(card.full, placed)}`, hint: slot.label(card.full), preset: { slot: id } };
-    });
-    for (const id of card.divs) {
-      const d = divOf(t, id);
-      out.push({ key: `divide:${id}`, move: "divide", label: `÷ ${d.value(card.full)}`, hint: d.label(card.full), preset: { div: id } });
-    }
-    out.push({ key: "case", move: "case", label: "+ new case", hint: "Start a separate case (added)" });
-    out.push({ key: "complement", move: "complement", label: "− complement", hint: "Everything, minus the ones you don't want" });
-    out.push({ key: "subtract", move: "subtract", label: "− overcount", hint: "Subtract what was counted too often" });
-    return out;
-  },
-  moveDef: (_card, id) => STRUCT_MOVES.find((m) => m.id === id),
+  toolbox: () => STRUCT_MOVES.filter((m) => !m.gesture),
+  moveDef: (id) => STRUCT_MOVES.find((m) => m.id === id),
   apply: (card, state, input) => applyStructMove(card, state, input.move, input.params),
   // Only an explicit "check" move ends a structure card.
   isGoal: (card, state) => checkStructure(card, state).ok,
   show: (state, card) => showStruct(card, state),
   answer: (card) => String(card.answer),
-  optionKey: (input) => (input.move === "slot" ? `slot:${input.params?.slot}` : input.move === "divide" ? `divide:${input.params?.div}` : input.move),
 };
+
+/** The problem's pieces: what each slot can stand for, in words only. */
+export function structPieces(card: StructCard): { id: string; label: string }[] {
+  const t = template(card.template);
+  return card.palette.map((id) => ({ id, label: slotOf(t, id).label(card.full) }));
+}

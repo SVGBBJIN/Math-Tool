@@ -8,7 +8,7 @@ precalculus. Next.js (App Router, TypeScript) · Supabase (Postgres, auth, stora
 | Milestone | Scope | State |
 |---|---|---|
 | **M1** | Schema, auth, problem bank, trainer, error log | ✅ built, tested |
-| **Moves** | Move-based practice engine (see below) | ✅ built, tested; Supabase path not yet run against a live database |
+| **Moves** | Move-based practice engine: guided walkthroughs on a drag-and-drop workspace (see below) | ✅ built, tested; Supabase path not yet run against a live database |
 | M2 | Sendblue sending, scheduler, inbound webhook, escalation tests | next |
 | M3 | Khan Academy proof entry | |
 | M4 | Endurance mode + vault | |
@@ -113,75 +113,143 @@ all progress lives in the browser's `localStorage` (`src/lib/guest`), and the mi
 
 ## Move-based practice engine (Moves tab)
 
-Instead of picking A–E, the student solves by choosing moves, and every move is checked by computation.
-Code: `src/lib/engine` (pure logic), `src/components/engine` (UI), `tests/engine-*.test.ts`.
+Every problem is solved step by step on an on-screen **workspace** that plays the role of paper. The problem sits at
+the top, and each step the student completes locks in below it, so the full solution builds up in view. There is no
+multiple choice anywhere: not for answers, not for "pick the next move", not in worked examples. Every step is
+checked by computation the moment it is made.
 
-**One shell, two modules.** Both share a state, a set of moves, a verifier and a goal (`types.ts`).
+Code: `src/lib/engine` (pure logic), `src/components/engine` (UI), `tests/engine-*.test.ts`, `tests/no-multiple-choice.test.tsx`.
 
-- **Module A, expressions** (`expr/`). The state is an expression, a set of equations joined by "or", or a
-  congruence. The student picks a named move and supplies its parameters (the factor, the two numbers); the
-  engine builds the resulting line and `verify.ts` checks it against the previous line by numeric evaluation
-  at pseudo-random points. Expressions must agree in value. Equations must keep the same solution set, and a
-  rejected step names the root that was lost or added. Lines that become undefined where the old one was fine
-  are reported as domain problems.
-- **Module B, structures** (`struct/`). The state is a count built from slots, cases, a subtracted part and a
-  divisor. The verifier enumerates what the structure really builds on a scaled-down version and compares it,
-  outcome by outcome, with a brute-force list. A mismatch shows a concrete arrangement that was counted twice,
-  missed or not allowed. Scaled-down means the same slots in the same roles with a smaller pool.
+### How a step is made (touch-first)
 
-**Around the cards** (`progress.ts`, `config.ts`).
+One gesture rule covers everything: **drag X onto Y, or tap X and then tap Y** (`components/engine/dnd.tsx`). Only
+pieces and tiles start drags (they carry `touch-action: none`); the rest of the page scrolls normally, and a press
+that moves less than a few pixels is a tap. Nothing depends on hover. Mouse works the same way.
 
-- A skill is one worked example, three easy reps and one twist. Mastery needs the twist. A skill opens when
-  the easy reps of its prerequisites are done.
-- Scaffolding dial: level 1 offers 4 moves, level 2 all moves, level 3 a blank page where the move is named
-  first. Hints go nudge, move name, full step; any hint removes mastery credit for that card.
-- The decision step has a visible timer (30 s for reps, 60 s for twists, per-card overrides). The reveal is
-  untimed. "Not sure" is always available and still shows the insight.
-- A miss or an assisted solve comes back as a fresh variant after 1, 3 and 7 days. Three misses in a row on a
-  skill re-show the worked example and park the skill for two days.
-- Daily set: one review from the queue, one new concept, one stretch from the weakest topic. Its minutes go
-  into `day_activity` as `moves` and count toward the 10-minute minimum; it is not a required plan item.
-- Quick reps (90 seconds) only draw from skills already worked in a lesson or daily set.
-- Misses appear in the Errors tab and the Wednesday review with problem, answer reached, correct answer, time,
-  error type and note. Every card is logged with topic, skill, level, time, wrong moves, hint level and result.
-- `CONTEST_DATE` in `config.ts` is a placeholder fallback (`NEXT_PUBLIC_CONTEST_DATE`); the date in Settings
-  wins. Pacing and the scaffolding/time ramp are computed from it.
+- **Module A (expressions).** Each term, factor and side is its own KaTeX-rendered piece. Drag a tile from the
+  toolbox onto a part, a side, or the `=` sign (the whole equation). Direct manipulations: drag a term across `=`
+  (the app flips its sign), drop a term on a like term to combine them, drop a term into a gap to regroup. A move
+  with parameters opens a tray of slots, filled by dragging a piece of the expression into the slot or with the
+  on-screen keypad (`Keypad.tsx`; the phone keyboard never opens). The ± on square roots is a toggle on the move.
+- **Module B (counting).** The problem's pieces are described in words only ("any runner not used yet"), never with
+  their counts. Drop a piece onto the canvas or the active part, then type how many options it has (`24`, `4!` and
+  `2×4!` all work); the count is checked at once. Tokens join pieces: `× Multiply` (empty slot), `+ Case`,
+  `− Overcount`, `− Complement`, `÷ Symmetry` (type the divisor). The final number comes from the structure.
+  **Check** brute-forces a scaled-down version and, on a mismatch, shows a concrete arrangement counted twice,
+  missed or not allowed, and outlines the part responsible.
+- **Feedback.** A valid step locks in with a one-line reason it works (using the student's own numbers where
+  possible); an invalid one shakes and snaps back with a one-line reason.
+- **Standing toolbox.** The same tiles, in the same order, for every card of a module (`EXPR_TOOLBOX`,
+  `STRUCT_MOVES`). A tile that can't act on the current kind of line is refused without counting as wrong.
 
-**How verification works.** `npm run verify:cards` (`src/lib/engine/verify-cards.ts`) runs before every build
-and fails it on any mismatch. For each of the 45 hand-written cards and 40 generated variants per generator it
-replays the reference path through the live verifier, then checks the key a second way that shares no code
-with it: exact polynomial identity, irreducibility of each factor and exact root tests for Module A; brute
-force of the full-size problem for Module B. `tests/engine-progress.test.ts` feeds it deliberately wrong keys
-to confirm they are caught.
+### Support levels, hints, timing
 
-**Add a card.** Add an entry to `CARDS` in a pack file (`packs/quadratics.ts`, `packs/counting.ts`) with its
-start, goal, reference path and key move, then run `npm run verify:cards`.
+- **Level 1, guided:** the part where the next step applies and the right tile are highlighted, and the kind of
+  step is named ("Pull out the common factor"). The student still builds the step. **Level 2, prompted:** only the
+  goal of the step ("Get everything onto one side"). **Level 3, open:** only the problem's goal.
+- The level moves **within a card**: up after 3 clean steps in a row, down after 2 rejected steps in a row
+  (`LEVEL_UP_CLEAN_STEPS`, `LEVEL_DOWN_ERRORS` in `config.ts`). The level a card ends on is remembered per skill.
+  The Scaffolding dial in the Moves tab can pin a level (Auto adapts).
+- **Hint ladder:** highlight the relevant part → name the kind of step → show the step. Any hint removes mastery
+  credit for that card, and the idea resurfaces later as a fresh variant.
+- **Timing:** only micro-session cards (quick reps and the daily set, `TIMED_SOURCES`) show a timer, and only on
+  the decision step: it stops once the key move (or a single-step card's only step) locks in. Lessons are untimed,
+  and so is the reveal. Budgets are per card type (`TIME_BUDGETS`, per-card `timeLimit`). **Not sure** is free and
+  skips to the reveal.
+- **Worked example:** interactive. The student predicts each step by performing it (guided, untimed, unscored);
+  **Show me this step** reveals it. The key move is called out as it locks in.
+- **Reveal:** an animated replay of the hand-authored shortest path with the key step highlighted, plus a note when
+  the student skipped the key step or took more steps than the shortest path. One line of insight.
 
-**Add a topic pack.** Write `packs/<name>.ts` exporting a `TopicPack` (skills, cards, `generate`) and list it
-in `registry.ts`. New Module A moves go in `expr/moves.ts`; new Module B problem shapes are templates
-registered with `registerTemplate`. Modular-arithmetic moves (reduce, cycle, evaluate) already exist and are
-tested, but no cards use them yet.
+### Skills and how cards are scheduled
 
-**Keeping content original.** No real contest problem, wording, name, year or number appears in the app; the
-verifier rejects card text that names one. Real problems are only tagged privately. `data/topic-distribution.json`
-holds aggregate topic shares and currently contains a placeholder estimate. Replace it with:
+A skill is one interactive worked example, three easy reps and one twist. **Mastery needs the twist, finished at
+Level 2 or 3 with no hints** (a twist never starts at Level 1, and dropping to Level 1 mid-card forfeits credit).
+Skills have prerequisites. Three misses in a row re-show the worked example and park the skill for two days.
+Earlier skills are mixed into later sets.
+
+**Skip a concept by testing out.** Any open skill that isn't mastered has a **Test out** button. The test is two
+fresh problems the student has never seen (an easy rep and a twist), on an open workspace (Level 3), untimed and
+without support-level changes. Passing both under the usual bar (no hints, at most 2 steps snapped back) marks the
+skill as known ("Skipped: tested out") and unlocks what depends on it. The test stops at the first card that
+doesn't pass; there is no penalty (no mistake, no resurfacing, no wheel-spin count) and the lesson stays open.
+One attempt per skill per day. Test cards are logged with source `test` (`canTestOut`, `testOutSteps`,
+`finishTestOut` in `progress.ts`).
+
+Daily set: one review from the mistakes queue, one new concept, one stretch from the weakest topic. Missed ideas
+come back as fresh variants (never the same card) after 1, 3 and 7 days. Quick reps only draw from skills already
+worked in a lesson or daily set.
+
+**Logs and mistakes.** Every step is logged (`progress.steps`): topic, skill, support level, time, wrong-move count,
+hint level, result. A missed card goes to the existing Errors tab and the Wednesday review with the problem, the
+student's whole final workspace, the correct result, time taken, which step failed, an error type the student taps
+(concept gap, didn't see the approach, setup error, arithmetic slip, misread, ran out of time; a metadata row on
+the reveal, not part of the problem) and an optional one-line note.
+
+`CONTEST_DATE` in `config.ts` is a placeholder fallback (`NEXT_PUBLIC_CONTEST_DATE`); the date in Settings wins.
+Pacing and the difficulty ramp are computed from it.
+
+### How verification works
+
+- **Module A, per step** (`expr/verify.ts`): the new line is compared with the previous one by numeric evaluation
+  at 12 seeded pseudo-random points, skipping points where the old line is undefined. Expressions must agree in
+  value; equations must keep the same solution set (a rejected step names the root lost or added); congruences
+  must agree at integer points. A new line that is undefined where the old one was fine (e.g. dividing by
+  something that can be 0) is reported as a domain problem.
+- **Module B, per step:** each typed count is compared with the slot's real option count at that position.
+  **On Check** (`struct/module.ts`): the structure is enumerated on the scaled-down version and compared, outcome
+  by outcome, with an independent brute-force list. Each card defines its scaled-down version (same template,
+  same slots in the same roles, smaller pool).
+- **Build gate:** `npm run verify:cards` (`verify-cards.ts`, runs before every build) replays every reference path
+  through the live verifier, re-checks every key a second way that shares no code with it (exact polynomial
+  identity, irreducibility and exact roots for Module A; full-size brute force for Module B), and for counting
+  cards replays the path again with every count typed as a student would. It covers the 45 hand-written cards and
+  40 generated variants per generator, and fails the build on any mismatch.
+- **Tests:** `tests/engine-expr.test.ts`, `engine-struct.test.ts` and `engine-gestures.test.ts` cover every verifier,
+  including steps that look valid but are not (a sum of squares as a difference of squares, only the positive
+  root, 3x and 3x² "combined", the starting count reused in a later slot, dividing by a number no symmetry
+  explains...). `tests/no-multiple-choice.test.tsx` renders every card at Levels 1–3, every worked example and the
+  reveal, and fails if any tappable control is not a standing toolbox tile, a fixed control, a keypad key or a
+  piece of the student's own workspace, or if the answer is ever a button.
+
+### Add a card
+
+Add an entry to `CARDS` in a pack file (`packs/quadratics.ts`, `packs/counting.ts`) with its prompt, start (or
+template and full/scaled-down parameters), goal, hand-authored shortest path and key move(s), then run
+`npm run verify:cards`. A card that doesn't verify can't ship.
+
+### Add a topic pack
+
+Write `packs/<name>.ts` exporting a `TopicPack` (skills, cards, `generate`) and list it in `registry.ts`. New Module A
+moves go in `expr/moves.ts` and need a `META` entry (toolbox group, Level 1 kind, Level 2 goal, confirmation line):
+they then appear in the standing toolbox automatically. New Module B problem shapes are templates registered with
+`registerTemplate` (slots described in words, option counts, an independent brute force). Modular-arithmetic moves
+(reduce, cycle, evaluate) already exist and are tested, but no cards use them yet.
+
+### Keeping content original
+
+No real contest problem, wording, name, year or number appears in the app; `verify:cards` rejects card text that
+names one. Real problems are only tagged privately to build `data/topic-distribution.json` (aggregate topic shares
+that drive sampling weights; it currently holds a placeholder estimate). Replace it with:
 
 ```bash
 npm run topics:build -- path/to/your-tagged.csv
 ```
 
-The CSV uses the problem bank's format (`contest,year,number,answer,topic,techniques`).
+The CSV uses the problem bank's format (`contest,year,number,answer,topic,techniques`). Generated cards are built
+backwards from their answers and replayed through the verifier before they are shown.
 
-**Known limitations.**
+### Known limitations
 
-- The Supabase path (migration `20261115000000_move_engine.sql`, save action, parent view) is typechecked but
-  has not been run against a live database. Guest mode was tested in a browser.
+- The Supabase path (migration, save action, parent view) is typechecked but has not been run against a live
+  database. Guest mode was driven end to end in a headless browser (factoring, an equation solved by dragging
+  terms across `=`, and a counting structure).
 - Moves are verified in the browser, so answers ship to the client and a determined student could edit saved
-  progress.
-- Progress is one JSON document per student; two devices open at once overwrite each other.
+  progress. Progress is one JSON document per student; two devices open at once overwrite each other.
 - Numeric verification is probabilistic in principle. Irrational roots get no named counterexample.
-- A move acts on a whole side or one top-level factor or term, not on deeper sub-expressions.
-- Hints after leaving the reference path only point back to its first step.
-- Module B covers ordered rows, unordered groups with an optional leader, and one glued pair. Probability is
-  not built.
+- A move acts on a whole side or one top-level term/factor, not on deeper sub-expressions. "Drag a factor out of a
+  group" is done with the Factor-out tile (drop the factor into its slot), not by dragging a sub-factor.
+- Level 1/2 guidance follows the hand-authored path; after a valid detour it says so and offers Undo instead of
+  re-planning from the new line.
+- Module B adds slots only to the active (last) part. Probability is not built yet.
 - "Shortest path" is hand-authored and replayed, not proven minimal.

@@ -14,9 +14,11 @@ import type { ApplyResult, MoveDef } from "../types";
 export class MoveError extends Error {}
 type Params = Record<string, string>;
 
-export interface ExprMove extends MoveDef {
+export interface ExprMove extends Omit<MoveDef, "kind" | "goal" | "why"> {
   kinds: ExprState["kind"][];
   build(s: ExprState, t: Target, p: Params): ExprState;
+  /** A one-line reason the step is valid, using the student's own numbers. */
+  confirm?(s: ExprState, t: Target, p: Params): string | undefined;
   /** A sharper one-line reason when the built line fails verification. */
   explain?(s: ExprState, t: Target, p: Params, fallback: string): string | undefined;
 }
@@ -67,11 +69,10 @@ const mapExprs = (s: ExprState, f: (e: Expr) => Expr): ExprState =>
 // ---- the moves ----------------------------------------------------------------
 const EXPRISH: ExprState["kind"][] = ["expr", "eqs"];
 
-export const EXPR_MOVES: ExprMove[] = [
+const RAW_MOVES: ExprMove[] = [
   {
     id: "gcf",
     name: "Factor out a common term",
-    aliases: ["common factor", "gcf", "greatest common factor", "pull out"],
     blurb: "Pull out what every term shares.",
     params: [{ name: "f", label: "Factor to pull out", kind: "term", placeholder: "3x" }],
     kinds: EXPRISH,
@@ -92,7 +93,6 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "diff_squares",
     name: "Difference of squares",
-    aliases: ["a2-b2", "squares", "conjugates"],
     blurb: "A² − B² = (A − B)(A + B).",
     params: [
       { name: "A", label: "A (so A² is the first square)", kind: "term", placeholder: "x" },
@@ -108,7 +108,6 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "trinomial",
     name: "Factor x² + bx + c (sum and product)",
-    aliases: ["sum product", "factor trinomial", "factor quadratic", "sum and product"],
     blurb: "Find two numbers that add to b and multiply to c.",
     params: [
       { name: "p", label: "First number", kind: "int", placeholder: "3" },
@@ -134,7 +133,6 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "split_middle",
     name: "Split the middle term",
-    aliases: ["ac method", "split", "decompose middle"],
     blurb: "Rewrite bx as px + qx with p·q = a·c.",
     params: [
       { name: "p", label: "First coefficient", kind: "int", placeholder: "6" },
@@ -162,7 +160,6 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "group",
     name: "Factor by grouping",
-    aliases: ["grouping", "group pairs"],
     blurb: "Factor each pair of terms, then pull out the shared bracket.",
     params: [],
     kinds: EXPRISH,
@@ -186,7 +183,6 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "perfect_square",
     name: "Perfect-square trinomial",
-    aliases: ["perfect square", "square of a binomial", "a2+2ab+b2"],
     blurb: "A² + 2AB + B² = (A + B)².",
     params: [
       { name: "A", label: "A", kind: "term", placeholder: "x" },
@@ -200,7 +196,6 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "expand",
     name: "Expand (multiply out)",
-    aliases: ["multiply out", "distribute", "foil"],
     blurb: "Multiply everything out and collect like terms.",
     params: [],
     kinds: EXPRISH,
@@ -211,7 +206,6 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "complete_square",
     name: "Complete the square",
-    aliases: ["vertex form", "complete square"],
     blurb: "Rewrite x² + bx + c as (x + h)² + k.",
     params: [
       { name: "h", label: "h", kind: "int", placeholder: "3" },
@@ -228,7 +222,6 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "add_subtract",
     name: "Add and subtract a term",
-    aliases: ["add zero", "add and subtract"],
     blurb: "Add a clever zero: + t − t.",
     params: [{ name: "t", label: "Term to add and subtract", kind: "term", placeholder: "4x^2" }],
     kinds: EXPRISH,
@@ -242,7 +235,6 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "substitute",
     name: "Substitute u = …",
-    aliases: ["substitution", "let u", "u-sub", "u sub"],
     blurb: "Rename a repeated chunk so a familiar shape appears.",
     params: [{ name: "T", label: "Let u stand for", kind: "term", placeholder: "x^2" }],
     kinds: EXPRISH,
@@ -280,7 +272,6 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "back_substitute",
     name: "Substitute back",
-    aliases: ["back substitute", "undo substitution", "replace u"],
     blurb: "Put the original chunk back in place of u.",
     params: [],
     kinds: EXPRISH,
@@ -295,7 +286,6 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "to_zero",
     name: "Move everything to one side (= 0)",
-    aliases: ["standard form", "set equal to zero", "get zero", "make zero"],
     blurb: "Collect all terms on the left so the right side is 0.",
     params: [],
     kinds: ["eqs"],
@@ -307,7 +297,6 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "add_both",
     name: "Add to both sides",
-    aliases: ["subtract from both sides", "add both", "both sides add"],
     blurb: "Add the same term to both sides (use a negative to subtract).",
     params: [{ name: "t", label: "Term to add (negative subtracts)", kind: "term", placeholder: "9" }],
     kinds: ["eqs"],
@@ -325,7 +314,6 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "div_both",
     name: "Divide both sides",
-    aliases: ["divide both", "both sides divide", "cancel"],
     blurb: "Divide both sides by the same non-zero quantity.",
     params: [{ name: "t", label: "Divide by", kind: "term", placeholder: "2" }],
     kinds: ["eqs"],
@@ -350,7 +338,6 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "zero_product",
     name: "Zero-product rule",
-    aliases: ["zero product", "set each factor to zero", "zero factor"],
     blurb: "If a product is 0, one of its factors is 0.",
     params: [],
     kinds: ["eqs"],
@@ -370,9 +357,8 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "sqrt_both",
     name: "Take square roots of both sides",
-    aliases: ["square root", "sqrt", "root both sides"],
     blurb: "If A² = k then A = √k or A = −√k.",
-    params: [{ name: "sign", label: "Which roots?", kind: "choice", options: [{ value: "both", label: "± both" }, { value: "plus", label: "+ only" }] }],
+    params: [{ name: "sign", label: "Include the negative root (±)", kind: "toggle", on: "both", off: "plus" }],
     kinds: ["eqs"],
     build(s, t, p) {
       const { eq, i, s: st } = eqAt(s, t);
@@ -394,7 +380,6 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "solve_linear",
     name: "Solve each linear equation",
-    aliases: ["isolate x", "solve for x", "solve linear", "isolate"],
     blurb: "Isolate the variable in every branch.",
     params: [],
     kinds: ["eqs"],
@@ -428,7 +413,6 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "reduce_mod",
     name: "Reduce mod n",
-    aliases: ["reduce", "take remainders", "mod"],
     blurb: "Replace each number by its remainder.",
     params: [],
     kinds: ["mod"],
@@ -451,7 +435,6 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "cycle",
     name: "Find the cycle of powers",
-    aliases: ["cycle", "period", "powers repeat", "pattern of powers"],
     blurb: "Powers repeat mod n: reduce the exponent by the cycle length.",
     params: [{ name: "len", label: "Cycle length", kind: "int", placeholder: "4" }],
     kinds: ["mod"],
@@ -485,7 +468,6 @@ export const EXPR_MOVES: ExprMove[] = [
   {
     id: "evaluate_mod",
     name: "Work out the remainder",
-    aliases: ["evaluate", "compute", "calculate"],
     blurb: "Compute the value and take its remainder.",
     params: [],
     kinds: ["mod"],
@@ -499,13 +481,154 @@ export const EXPR_MOVES: ExprMove[] = [
   },
 ];
 
+// ---- direct manipulations (gestures, not tiles) -----------------------------------
+function sumParts(s: ExprState, t: Target): { side: Expr; terms: Expr[] } {
+  const side = sideOf(s, { ...t, part: undefined });
+  return { side, terms: side.k === "add" ? side.terms : [side] };
+}
+function index(p: Params, name: string, n: number): number {
+  const i = Number(p[name]);
+  if (!Number.isInteger(i) || i < 0 || i >= n) throw new MoveError("Pick a term on this side.");
+  return i;
+}
+const withSide = (s: ExprState, t: Target, e: Expr) => setTarget(s, { ...t, part: undefined }, e);
+/** Same power of every variable (3x and −5x yes; 3x and 3x² no). */
+function likeTerms(a: Expr, b: Expr): boolean {
+  const A = tryPoly(a);
+  const B = tryPoly(b);
+  if (!A || !B || A.size !== 1 || B.size !== 1) return false;
+  return [...A.keys()][0] === [...B.keys()][0];
+}
+
+const GESTURES: ExprMove[] = [
+  {
+    id: "combine",
+    name: "Combine like terms",
+    blurb: "Tap one term, then a like term on the same side.",
+    params: [],
+    kinds: EXPRISH,
+    build(s, t, p) {
+      const { terms } = sumParts(s, t);
+      const i = index(p, "i", terms.length);
+      const j = index(p, "j", terms.length);
+      if (i === j) throw new MoveError("Pick two different terms.");
+      if (!likeTerms(terms[i], terms[j])) {
+        throw new MoveError(`${show(terms[i])} and ${show(terms[j])} aren't like terms: they need exactly the same power of each letter.`);
+      }
+      const merged = fromPoly(pAdd(poly(terms[i]), poly(terms[j])));
+      const [lo, hi] = i < j ? [i, j] : [j, i];
+      const rest = terms.filter((_, k) => k !== hi).map((x, k) => (k === lo ? merged : x)).filter((x) => !(x.k === "num" && x.n === 0) || terms.length === 2);
+      return withSide(s, t, add(rest, true));
+    },
+    confirm(s, t, p) {
+      const { terms } = sumParts(s, t);
+      return `${show(terms[Number(p.i)])} and ${show(terms[Number(p.j)])} have the same power of x, so their coefficients just add.`;
+    },
+  },
+  {
+    id: "reorder",
+    name: "Regroup terms",
+    blurb: "Drag a term to a new place in its sum.",
+    params: [],
+    kinds: EXPRISH,
+    build(s, t, p) {
+      const { terms } = sumParts(s, t);
+      if (terms.length < 2) throw new MoveError("There is only one term here.");
+      const i = index(p, "i", terms.length);
+      const to = Math.max(0, Math.min(terms.length, Number(p.to)));
+      const moved = terms[i];
+      const rest = terms.filter((_, k) => k !== i);
+      rest.splice(to > i ? to - 1 : to, 0, moved);
+      return withSide(s, t, add(rest, true));
+    },
+  },
+  {
+    id: "move_across",
+    name: "Move a term across the equals sign",
+    blurb: "Drag a term to the other side; its sign flips.",
+    params: [],
+    kinds: ["eqs"],
+    build(s, t, p) {
+      const { eq, i, s: st } = eqAt(s, t);
+      const from = t.side === "rhs" ? "rhs" : "lhs";
+      const { terms } = sumParts(s, { ...t, side: from });
+      const k = index(p, "i", terms.length);
+      const moved = terms[k];
+      const left = terms.filter((_, j) => j !== k);
+      const origin = left.length ? add(left, true) : num(0);
+      const other = from === "lhs" ? eq.rhs : eq.lhs;
+      const flipped = neg(moved);
+      const target = other.k === "num" && other.n === 0 ? flipped : add([...(other.k === "add" ? other.terms : [other]), flipped], true);
+      // The student flips nothing by hand: the app does it, and the verifier checks the result.
+      const next = from === "lhs" ? { lhs: origin, rhs: target } : { lhs: target, rhs: origin };
+      return withEqs(st, i, [next]);
+    },
+    confirm(s, t, p) {
+      const { terms } = sumParts(s, t);
+      const moved = terms[Number(p.i)];
+      return moved ? `Subtracting ${show(moved)} from both sides moves it across with its sign flipped.` : undefined;
+    },
+  },
+];
+
+// ---- toolbox metadata: where each tile sits, and what Level 1 / Level 2 say about it -------
+const META: Record<string, Pick<MoveDef, "group" | "kind" | "goal" | "why">> = {
+  gcf: { group: "factor", kind: "Pull out the common factor", goal: "Take out what every term shares", why: "It divides every term, and multiplying back gives the same expression." },
+  diff_squares: { group: "factor", kind: "Use the difference of squares", goal: "Split a square minus a square into two brackets", why: "A² − B² = (A − B)(A + B): the middle terms cancel when you multiply back." },
+  trinomial: { group: "factor", kind: "Factor with sum and product", goal: "Turn the quadratic into a product of two brackets", why: "(x + p)(x + q) = x² + (p + q)x + pq, and your numbers match." },
+  split_middle: { group: "factor", kind: "Split the middle term", goal: "Rewrite the middle term so the four terms can be paired", why: "The two pieces add to the middle coefficient and multiply to a·c." },
+  group: { group: "factor", kind: "Factor by grouping", goal: "Pair the terms so they share a bracket", why: "Both pairs share the same bracket, so it comes out of the whole sum." },
+  perfect_square: { group: "factor", kind: "Spot the perfect square", goal: "Write this as one bracket squared", why: "A² + 2AB + B² = (A + B)², and the middle term is exactly 2AB." },
+  expand: { group: "rewrite", kind: "Expand", goal: "Multiply everything out", why: "Expanding never changes the value." },
+  complete_square: { group: "rewrite", kind: "Complete the square", goal: "Write it as a square plus a constant", why: "(x + h)² + k multiplies back to the same quadratic." },
+  add_subtract: { group: "rewrite", kind: "Add and subtract the same term", goal: "Add a clever zero to reveal a pattern", why: "Adding t and taking t away again adds 0." },
+  substitute: { group: "rewrite", kind: "Substitute a new letter", goal: "Rename the repeated chunk so a familiar shape appears", why: "Every copy of the chunk is replaced, so nothing else changes." },
+  back_substitute: { group: "rewrite", kind: "Substitute back", goal: "Put the original chunk back", why: "u was only a name for the chunk." },
+  to_zero: { group: "equation", kind: "Get 0 on one side", goal: "Get everything onto one side", why: "Subtracting the same thing from both sides keeps every solution." },
+  add_both: { group: "equation", kind: "Add the same thing to both sides", goal: "Change both sides the same way", why: "Doing the same to both sides keeps the equation balanced." },
+  div_both: { group: "equation", kind: "Divide both sides", goal: "Shrink both sides by the same non-zero number", why: "Dividing both sides by the same non-zero number keeps every solution." },
+  zero_product: { group: "equation", kind: "Use the zero-product rule", goal: "Split into one equation per factor", why: "A product is 0 exactly when one of its factors is 0." },
+  sqrt_both: { group: "equation", kind: "Take square roots of both sides", goal: "Undo the square", why: "Both √k and −√k square to k, so both are kept." },
+  solve_linear: { group: "equation", kind: "Isolate x", goal: "Finish each branch as x = a number", why: "Each branch is linear, so x is pinned to one value." },
+  reduce_mod: { group: "mod", kind: "Reduce mod n", goal: "Replace numbers by their remainders", why: "Numbers with the same remainder behave the same mod n." },
+  cycle: { group: "mod", kind: "Find the cycle of powers", goal: "Shrink the exponent using a repeating pattern", why: "The powers repeat with that period, which the app checked." },
+  evaluate_mod: { group: "mod", kind: "Work out the remainder", goal: "Finish with a single remainder", why: "That is the value of the expression mod n." },
+  combine: { kind: "Combine like terms (tap one, then the other)", goal: "Collect matching terms", why: "Like terms have the same power, so their coefficients add." },
+  reorder: { kind: "Regroup terms (drag one to a new place)", goal: "Put the terms in a better order", why: "Order doesn't change a sum." },
+  move_across: { kind: "Move a term across the = sign", goal: "Get the terms onto one side", why: "Its sign flips because it was subtracted from both sides." },
+};
+
+const sh = (p: Params, k: string) => {
+  try {
+    return show(parseExpr(p[k] ?? ""));
+  } catch {
+    return p[k] ?? "";
+  }
+};
+const CONFIRM: Record<string, ExprMove["confirm"]> = {
+  gcf: (_s, _t, p) => `${sh(p, "f")} divides every term, and multiplying back gives the original.`,
+  diff_squares: (_s, _t, p) => `${sh(p, "A")}² − ${sh(p, "B")}² = (A − B)(A + B) with A = ${sh(p, "A")}, B = ${sh(p, "B")}.`,
+  trinomial: (_s, _t, p) => `${p.p} + ${p.q} = ${Number(p.p) + Number(p.q)} and ${p.p}·${p.q} = ${Number(p.p) * Number(p.q)}: sum and product match.`.replace(/-/g, "−"),
+  split_middle: (_s, _t, p) => `${p.p} + ${p.q} is the middle coefficient and ${p.p}·${p.q} = a·c.`.replace(/-/g, "−"),
+  add_both: (_s, _t, p) => `Adding ${sh(p, "t")} to both sides keeps the equation balanced.`,
+  div_both: (_s, _t, p) => `Dividing both sides by ${sh(p, "t")} (never 0) keeps every solution.`,
+};
+
+export const EXPR_MOVES: (ExprMove & MoveDef)[] = [...RAW_MOVES, ...GESTURES].map((m) => {
+  const meta = META[m.id];
+  if (!meta) throw new Error(`Move ${m.id} has no toolbox metadata`);
+  return { ...m, ...meta, confirm: m.confirm ?? CONFIRM[m.id], gesture: !meta.group };
+});
 export const exprMove = (id: string) => EXPR_MOVES.find((m) => m.id === id);
+/** The standing Module A toolbox: every tile, the same for every card. */
+export const EXPR_TOOLBOX: MoveDef[] = EXPR_MOVES.filter((m) => !m.gesture);
 
 /** Build the candidate line, then verify it against the previous one by computation. */
 export function applyExprMove(s: ExprState, moveId: string, params: Params = {}, target: Target = {}): ApplyResult<ExprState> {
   const move = exprMove(moveId);
   if (!move) return { ok: false, reason: "Unknown move." };
-  if (!move.kinds.includes(s.kind)) return { ok: false, reason: "That move doesn't apply to this kind of problem." };
+  // A tile from the standing toolbox that can't act on this kind of line is refused, but not counted as wrong.
+  if (!move.kinds.includes(s.kind)) return { ok: false, reason: `"${move.name}" doesn't act on ${s.kind === "eqs" ? "an equation" : s.kind === "mod" ? "a congruence" : "a bare expression"}.`, noop: true };
   let next: ExprState;
   try {
     next = move.build(s, target, params);
@@ -515,7 +638,15 @@ export function applyExprMove(s: ExprState, moveId: string, params: Params = {},
   }
   if (showState(next) === showState(s)) return { ok: false, reason: "That doesn't change anything.", noop: true };
   const verdict = verifyStep(s, next);
-  if (verdict.ok) return { ok: true, state: next };
+  if (verdict.ok) {
+    let why: string | undefined;
+    try {
+      why = move.confirm?.(s, target, params);
+    } catch {
+      why = undefined;
+    }
+    return { ok: true, state: next, why: why ?? move.why };
+  }
 
   let reason = verdict.reason;
   let custom: string | undefined;

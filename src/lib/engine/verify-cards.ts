@@ -10,7 +10,7 @@ import { evaluate, gcd, parseExpr, varsOf, type Expr } from "./expr/ast";
 import type { ExprCard } from "./expr/module";
 import { coeffs, fAdd, fMul, fr, fVal, pEq, pMul, pConst, pSub, pVars, pDegree, squareFree, toPoly, type Frac, type Poly } from "./expr/poly";
 import { parseState } from "./expr/state";
-import { runTerm, structModule, template, type StructCard, type StructState } from "./struct/module";
+import { divOf, runTerm, structModule, template, type StructCard, type StructState } from "./struct/module";
 import { PACKS, replay, type Card } from "./registry";
 
 export interface Failure { card: string; problem: string }
@@ -118,12 +118,30 @@ function checkStructKey(card: StructCard): string[] {
   for (const term of state.terms) {
     const run = runTerm(t, term, card.full);
     if (run.uneven) out.push(`slot "${run.uneven.slot.id}" shows ${run.uneven.expected} options but offers ${run.uneven.got} on the full problem`);
-    const d = term.div ? t.divisors.find((x) => x.id === term.div)!.value(card.full) : 1;
+    const d = term.div ? divOf(t, term.div).value(card.full) : 1;
     for (const [key, m] of run.mult) total.set(key, (total.get(key) ?? 0) + (term.sign * m) / d);
   }
   const valid = new Set(t.universe(card.full));
   for (const [key, c] of total) if (Math.abs(c - (valid.has(key) ? 1 : 0)) > 1e-9) out.push(`reference structure counts ${t.show(key, card.full)} ${c} times on the full problem`);
   for (const key of valid) if (!total.has(key)) out.push(`reference structure misses ${t.show(key, card.full)} on the full problem`);
+
+  // The same path entered the way a student does it on the canvas: every slot's count and
+  // every divisor typed as a number. Each must be accepted, and the result must check out.
+  let typed: StructState = structModule.init(card);
+  for (const [i, step] of card.path.entries()) {
+    let input = step;
+    if (step.move === "slot") {
+      const placed = typed.terms.at(-1)?.slots.length ?? 0;
+      const slot = t.slots.find((x) => x.id === step.params?.slot);
+      if (!slot) { out.push(`step ${i + 1}: unknown slot`); break; }
+      input = { move: "slot", params: { slot: slot.id, count: String(slot.count(card.full, placed)) } };
+    } else if (step.move === "divide" && step.params?.div) {
+      input = { move: "divide", params: { value: String(divOf(t, step.params.div).value(card.full)) } };
+    }
+    const r = structModule.apply(card, typed, input);
+    if (!r.ok) { out.push(`typed entry, step ${i + 1} (${step.move}): ${r.reason}`); break; }
+    typed = r.state;
+  }
   return out;
 }
 
