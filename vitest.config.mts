@@ -3,5 +3,7 @@ import path from "node:path";
 
 export default defineConfig({
   resolve: { alias: { "@": path.resolve(__dirname, "src") } },
-  test: { include: ["tests/**/*.test.ts"] },
+  // JSX for the render tests (tsconfig keeps "preserve" for Next.js).
+  oxc: { jsx: { runtime: "automatic" } },
+  test: { include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"] },
 });

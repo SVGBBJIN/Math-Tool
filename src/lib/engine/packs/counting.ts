@@ -48,7 +48,15 @@ const seq: StructTemplate = {
       .filter((row) => (kind === 2 ? row.includes(String(p.special)) : kind === 3 ? new Set(row).size < row.length : true))
       .map(seqKey);
   },
-  show: (key, p) => (key ? `"${values(key.split(" ")).join(String(p.sep ?? ""))}"` : "(nothing)"),
+  // Positions never filled print as "_", so an unfinished structure reads as e.g. "A_".
+  show(key, p) {
+    const row: string[] = Array.from({ length: k(p) }, () => "_");
+    for (const f of key ? key.split(" ") : []) {
+      const i = Number(f.slice(0, f.indexOf(":"))) - 1;
+      if (i >= 0 && i < row.length) row[i] = f.slice(f.indexOf(":") + 1);
+    }
+    return `"${row.join(String(p.sep ?? ""))}"`;
+  },
 };
 
 // ---- template: unordered groups, optionally with one leader ---------------------------

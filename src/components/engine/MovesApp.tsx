@@ -4,7 +4,7 @@
 // student's progress document and a `save` function (browser for guests, Supabase otherwise).
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { pacing, timeBudget, type Pacing } from "@/lib/engine/config";
+import { isTimed, pacing, timeBudget, type Pacing } from "@/lib/engine/config";
 import {
   availability, dailyStatus, ensureDailySet, markExampleSeen, minutesOn, nextLessonStep, quickSteps, recordCard, setMistakeDetails, skillState,
   type EngineEvent, type EngineProgress, type Level, type Result, type Step,
@@ -55,7 +55,7 @@ export function MovesApp({
     <div className="space-y-4 md:space-y-6">
       <section className="card">
         <h1 className="h2">Moves</h1>
-        <p className="text-sm text-muted">Solve by choosing the move. Every step is checked by computation.</p>
+        <p className="text-sm text-muted">Solve on the workspace, step by step: drag the pieces, the app checks every step by computation. No paper needed.</p>
         <p className="mt-2 text-xs text-muted">
           {pace.daysLeft === null ? (
             <>Contest date not set, so pacing uses the gentlest ramp. <Link href={settings} className="font-semibold text-brand">Set it in Settings →</Link></>
@@ -118,7 +118,7 @@ export function MovesApp({
               </button>
             ))}
           </div>
-          <p className="mt-2 text-xs text-muted">1: pick from 4 moves · 2: all moves · 3: blank page, name the move first. Auto raises the level as you improve.</p>
+          <p className="mt-2 text-xs text-muted">1: the next step is highlighted and named · 2: you get only the goal of each step · 3: a blank workspace and the problem&apos;s goal. Auto moves up after clean steps and down after repeated errors.</p>
         </section>
       )}
 
@@ -243,12 +243,15 @@ function Session({
           card={card}
           level={step.level as Level}
           budget={timeBudget(card, pace)}
+          timed={isTimed(step.source)}
+          adaptive={latest.current.dial === 0}
           label={`${SOURCE_LABEL[step.source]}${card.type === "twist" ? " · twist" : ""}`}
           onFinish={(run) => {
             const rec = recordCard(latest.current, {
               cardId: card.id, source: step.source, level: step.level, seconds: run.seconds, wrongMoves: run.wrongMoves, hintLevel: run.hintLevel,
               outcome: run.outcome, skippedKeyMove: run.skippedKeyMove, problem: problemText(card), userAnswer: run.userAnswer,
               correctAnswer: moduleOf(card).answer(card), queueId: step.queueId,
+              steps: run.steps, failedStep: run.failedStep, workspace: run.workspace, endLevel: run.endLevel,
             }, today);
             commit(rec.progress);
             index.current++;

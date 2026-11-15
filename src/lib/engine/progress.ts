@@ -7,7 +7,7 @@ import { addDays } from "../dates";
 import { applyMiss, applyTwinOutcome } from "../review";
 import { smoothedAccuracy } from "../trainer";
 import {
-  MAX_LOGS, MAX_MINUTES_PER_CARD, MAX_WRONG_MOVES_FOR_CREDIT, PARK_DAYS, QUICK_CARDS, RESURFACE_DAYS, WHEEL_SPIN_FAILURES, type Pacing,
+  MAX_LOGS, MAX_MINUTES_PER_CARD, MAX_STEP_LOGS, MAX_WRONG_MOVES_FOR_CREDIT, PARK_DAYS, QUICK_CARDS, RESURFACE_DAYS, WHEEL_SPIN_FAILURES, type Pacing,
 } from "./config";
 import { ALL_SKILLS, PACKS, generateCard, getCard, skillOf, topicOfSkill } from "./registry";
 import type { Skill } from "./types";
@@ -34,6 +34,8 @@ export interface SkillProgress {
   lastSeen: string | null;
   /** Bumped for every generated card, so variants are never repeated. */
   seq: number;
+  /** Support level the student ended the last card on (moves up after clean steps, down after errors). */
+  level?: Level;
 }
 
 export interface QueueItem {
@@ -59,6 +61,10 @@ export interface Mistake {
   correctAnswer: string;
   seconds: number;
   outcome: Outcome;
+  /** The step that wasn't managed, e.g. "Step 2: Zero-product rule". */
+  failedStep?: string;
+  /** Every line on the student's workspace when the card ended. */
+  workspace?: string[];
   /** One of ERROR_TYPES in src/lib/tags.ts; null until the student taps one. */
   errorType: string | null;
   note: string;
@@ -81,6 +87,26 @@ export interface CardLog {
   hintLevel: number;
   result: Result;
   skippedKeyMove: boolean;
+}
+
+/** One step of one card, as performed. */
+export interface StepRecord {
+  /** Move that locked the step in (or the reference move that was never managed). */
+  move: string;
+  level: Level;
+  seconds: number;
+  wrongMoves: number;
+  /** Highest hint rung used on this step (0 = none). */
+  hintLevel: number;
+  result: "ok" | "unfinished";
+}
+export interface StepLog extends StepRecord {
+  at: string;
+  date: string;
+  cardId: string;
+  topic: string;
+  skill: string;
+  index: number;
 }
 
 export interface Step {
@@ -108,11 +134,13 @@ export interface EngineProgress {
   queue: QueueItem[];
   mistakes: Mistake[];
   logs: CardLog[];
+  /** Per-step logs (topic, skill, level, time, wrong moves, hint level, result). */
+  steps?: StepLog[];
   daily: DailySet | null;
 }
 
 export function emptyProgress(): EngineProgress {
-  return { v: ENGINE_VERSION, dial: 0, skills: {}, queue: [], mistakes: [], logs: [], daily: null };
+  return { v: ENGINE_VERSION, dial: 0, skills: {}, queue: [], mistakes: [], logs: [], steps: [], daily: null };
 }
 export function isEngineProgress(x: unknown): x is EngineProgress {
   if (!x || typeof x !== "object") return false;
@@ -157,18 +185,28 @@ function variant(p: EngineProgress, skillId: string, type: "rep" | "twist", avoi
   return id;
 }
 
+/**
+ * Starting support level for a card. 1 = guided (highlight + kind of step), 2 = prompted
+ * (goal of the step + the standing toolbox), 3 = open. The level then moves within the card
+ * (up after clean steps, down after errors) and the card's end level is remembered per skill.
+ */
 export function levelFor(p: EngineProgress, skillId: string, type: "rep" | "twist", source: Source, pace: Pacing, queueStage = 0): Level {
   if (p.dial) return p.dial;
   const sp = skillState(p, skillId);
+  // The first easy rep of a brand-new skill is always guided.
+  const firstContact = (source === "lesson" || source === "new") && type === "rep" && sp.reps === 0 && !sp.level;
+  if (firstContact) return 1;
   let level: Level;
   if (source === "review") level = queueStage === 0 ? 2 : 3;
   else if (source === "quick") level = sp.stage === "mastered" ? 3 : 2;
   else if (source === "stretch") level = type === "twist" ? 2 : 3;
   else if (type === "twist") level = 2;
   else level = sp.reps >= 2 ? 2 : 1;
-  // The first reps of a brand-new skill always keep the 4-move menu.
-  const firstContact = (source === "lesson" || source === "new") && type === "rep" && sp.reps === 0;
-  return firstContact ? 1 : (Math.max(level, pace.minLevel) as Level);
+  // What the student last earned on this skill wins over the default, in either direction,
+  // except that a twist never starts guided: mastery needs it at Level 2 or 3.
+  if (sp.level) level = sp.level;
+  if (type === "twist" && level < 2) level = 2;
+  return Math.max(level, pace.minLevel) as Level;
 }
 
 /** The next card of a skill's lesson: worked example + 3 easy reps, then the twist. Null once mastered. */
@@ -197,6 +235,12 @@ export interface CardOutcome {
   userAnswer: string;
   correctAnswer: string;
   queueId?: string;
+  /** Every step as performed (and the one left unfinished). */
+  steps?: StepRecord[];
+  failedStep?: string;
+  workspace?: string[];
+  /** Support level when the card ended. */
+  endLevel?: Level;
 }
 export type EngineEvent = "reps_done" | "mastered" | "parked";
 export interface Recorded {
@@ -216,7 +260,10 @@ export function recordCard(p0: EngineProgress, o: CardOutcome, today: string, no
   if (!card || card.type === "worked") throw new Error(`Cannot record card ${o.cardId}`);
   const skillId = card.skill;
   const type = card.type;
-  const credit = o.outcome === "solved" && o.hintLevel === 0 && o.wrongMoves <= MAX_WRONG_MOVES_FOR_CREDIT;
+  // Mastery credit: solved without hints and without too many rejected moves. A twist also
+  // has to be finished at Level 2 or 3 (support may drop to Level 1 mid-card after errors).
+  const finalLevel = o.endLevel ?? o.level;
+  const credit = o.outcome === "solved" && o.hintLevel === 0 && o.wrongMoves <= MAX_WRONG_MOVES_FOR_CREDIT && (type !== "twist" || (o.level >= 2 && finalLevel >= 2));
   const result: Result = credit ? "pass" : o.outcome === "solved" ? "assisted" : o.outcome;
   const missed = o.outcome !== "solved";
   const events: EngineEvent[] = [];
@@ -229,6 +276,7 @@ export function recordCard(p0: EngineProgress, o: CardOutcome, today: string, no
     introducedOn: sp.introducedOn ?? today,
     lastSeen: today,
     seq: sp.seq + (card.generated ? 1 : 0),
+    level: p0.dial ? sp.level : (o.endLevel ?? sp.level),
   };
   if (credit) {
     next.failures = 0;
@@ -277,6 +325,7 @@ export function recordCard(p0: EngineProgress, o: CardOutcome, today: string, no
       id: mistakeId, at: now.toISOString(), date: today, cardId: o.cardId, skill: skillId, topic: topicOfSkill(skillId),
       problem: o.problem, userAnswer: o.userAnswer, correctAnswer: o.correctAnswer, seconds: Math.round(o.seconds), outcome: o.outcome,
       errorType: o.outcome === "timeout" ? "out_of_time" : null, note: "", takeaway: null, reviewedOn: null,
+      failedStep: o.failedStep, workspace: o.workspace,
     };
     p = { ...p, mistakes: [...p.mistakes, m] };
   }
@@ -287,6 +336,10 @@ export function recordCard(p0: EngineProgress, o: CardOutcome, today: string, no
     seconds: Math.round(o.seconds), wrongMoves: o.wrongMoves, hintLevel: o.hintLevel, result, skippedKeyMove: o.skippedKeyMove,
   };
   p = { ...p, logs: [...p.logs, log].slice(-MAX_LOGS) };
+  const stepLogs: StepLog[] = (o.steps ?? []).map((st, index) => ({
+    ...st, at: now.toISOString(), date: today, cardId: o.cardId, topic: topicOfSkill(skillId), skill: skillId, index, seconds: Math.round(st.seconds * 10) / 10,
+  }));
+  p = { ...p, steps: [...(p.steps ?? []), ...stepLogs].slice(-MAX_STEP_LOGS) };
 
   // Daily set.
   if (p.daily?.date === today) {

@@ -58,3 +58,21 @@ body {
     @apply text-lg font-bold;
   }
 }
+
+/* Move engine: a rejected step shakes before it snaps back; the reveal replays line by line. */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+@keyframes replay-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.replay-line {
+  opacity: 0;
+  animation: replay-in 0.35s ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .replay-line { animation: none; opacity: 1; }
+}

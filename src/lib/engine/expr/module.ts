@@ -1,6 +1,6 @@
 // Module A (expressions) wired into the common shell.
 import { evaluate, parseExpr, show, varsOf, type Expr } from "./ast";
-import { applyExprMove, exprMove } from "./moves";
+import { applyExprMove, EXPR_TOOLBOX, exprMove } from "./moves";
 import { parseState, showState, type ExprState, type Target } from "./state";
 import type { CardBase, EngineModule } from "../types";
 
@@ -14,8 +14,6 @@ export interface ExprCard extends CardBase {
   module: "expr";
   start: string;
   goal: ExprGoal;
-  /** Move ids available on this card (the pack's move list). */
-  moves: string[];
 }
 
 const PROBES = [0.371, 1.618, -2.236, 3.1416, -0.577, 4.669];
@@ -85,13 +83,8 @@ export function defaultTarget(s: ExprState): Target {
 export const exprModule: EngineModule<ExprState, ExprCard> = {
   id: "expr",
   init: (card) => parseState(card.start),
-  // Only moves that make sense for this kind of line (no "divide both sides" on a bare expression).
-  options: (card, state) =>
-    card.moves.flatMap((id) => {
-      const m = exprMove(id);
-      return m && m.kinds.includes(state.kind) ? [{ key: m.id, move: m.id, label: m.name, hint: m.blurb }] : [];
-    }),
-  moveDef: (_card, id) => exprMove(id),
+  toolbox: () => EXPR_TOOLBOX,
+  moveDef: (id) => exprMove(id),
   apply(card, state, input) {
     const r = applyExprMove(state, input.move, input.params, input.target ?? defaultTarget(state));
     return r.ok ? { ...r, done: exprGoalReached(card.goal, r.state) } : r;
@@ -106,5 +99,4 @@ export const exprModule: EngineModule<ExprState, ExprCard> = {
     const name = start.kind === "eqs" ? ([...varsOf(start.eqs[0].lhs), ...varsOf(start.eqs[0].rhs)][0] ?? "x") : "x";
     return g.solutions.map((x) => `${name} = ${show(parseExpr(x))}`).join("  or  ");
   },
-  optionKey: (input) => input.move,
 };

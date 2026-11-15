@@ -4,18 +4,34 @@
 export interface ParamSpec {
   name: string;
   label: string;
-  kind: "int" | "term" | "choice";
+  /**
+   * int / term: a slot filled by dropping a piece of the expression into it or with the keypad.
+   * toggle: an on/off switch on the move itself (e.g. "include the negative root"), never a list.
+   */
+  kind: "int" | "term" | "toggle";
   placeholder?: string;
-  options?: { value: string; label: string }[];
+  /** toggle only: the value sent when on / off. */
+  on?: string;
+  off?: string;
 }
+
+export type ToolGroup = "factor" | "rewrite" | "equation" | "mod" | "build" | "join";
 
 export interface MoveDef {
   id: string;
   name: string;
-  /** Extra names accepted at scaffolding level 3, where the student names the move first. */
-  aliases?: string[];
   blurb: string;
   params: ParamSpec[];
+  /** Where the tile sits in the standing toolbox. Gesture-only moves have no tile. */
+  group?: ToolGroup;
+  /** Performed by direct manipulation (drag a term across "=", tap two like terms...), not a tile. */
+  gesture?: boolean;
+  /** Level 1: names the kind of step ("pull out the common factor"). */
+  kind: string;
+  /** Level 2: only the goal of the step ("get everything the terms share outside a bracket"). */
+  goal: string;
+  /** One line shown when the step locks in: why it works. */
+  why: string;
 }
 
 /** One move as the student (or a reference path) makes it. */
@@ -27,7 +43,7 @@ export interface MoveInput {
 }
 
 export type ApplyResult<S> =
-  | { ok: true; state: S; done?: boolean }
+  | { ok: true; state: S; done?: boolean; /** One line: why this step is valid. */ why?: string }
   | {
       ok: false;
       /** One line: why the move was rejected. */
@@ -38,15 +54,6 @@ export type ApplyResult<S> =
       /** Rejected because it changes nothing: not counted as a wrong move. */
       noop?: boolean;
     };
-
-/** A choice offered in the move menu. Module B presets the parameters (a specific slot). */
-export interface MoveOption {
-  key: string;
-  move: string;
-  label: string;
-  hint?: string;
-  preset?: Record<string, string>;
-}
 
 export type CardType = "worked" | "rep" | "twist";
 export type ModuleId = "expr" | "struct";
@@ -75,16 +82,18 @@ export interface CardBase {
 export interface EngineModule<S, C extends CardBase> {
   id: ModuleId;
   init(card: C): S;
-  /** Every move in this card's pack (scaffolding level 2 shows all of them). */
-  options(card: C, state: S): MoveOption[];
-  moveDef(card: C, moveId: string): MoveDef | undefined;
+  /**
+   * The standing toolbox: the same tiles for every card of this module, never a list
+   * built for the question in front of the student.
+   */
+  toolbox(): MoveDef[];
+  moveDef(moveId: string): MoveDef | undefined;
   /** Builds the next state and verifies it by computation. */
   apply(card: C, state: S, input: MoveInput): ApplyResult<S>;
   isGoal(card: C, state: S): boolean;
   show(state: S, card: C): string;
   /** The answer in its final form, for the reveal and the mistakes log. */
   answer(card: C): string;
-  optionKey(input: MoveInput): string;
 }
 
 export interface Skill {

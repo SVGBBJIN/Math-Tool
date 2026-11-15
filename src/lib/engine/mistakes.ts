@@ -10,7 +10,9 @@ export function engineMissRows(p: EngineProgress): MissRow[] {
   return p.mistakes.map((m) => ({
     id: ENGINE_MISS_PREFIX + m.id,
     date: m.date,
-    yourAnswer: m.outcome === "not_sure" ? `not sure (reached ${m.userAnswer})` : m.outcome === "timeout" ? `ran out of time at ${m.userAnswer}` : m.userAnswer,
+    yourAnswer:
+      (m.outcome === "not_sure" ? `not sure (reached ${m.userAnswer})` : m.outcome === "timeout" ? `ran out of time at ${m.userAnswer}` : m.userAnswer) +
+      (m.failedStep ? ` · stopped at ${m.failedStep}` : ""),
     correctAnswer: m.correctAnswer,
     errorType: m.errorType ?? "",
     keyIdea: m.note || getCard(m.cardId)?.insight || "",
