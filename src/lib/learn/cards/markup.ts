@@ -21,9 +21,9 @@ export type Segment = { t: "text"; s: string } | { t: "bold"; s: string } | { t:
 
 const SYMBOLS: Record<string, string> = {
   cdot: "·", times: "×", div: "÷", pm: "±", le: "≤", ge: "≥", ne: "≠", equiv: "≡", approx: "≈", angle: "∠", triangle: "△",
-  pi: "π", deg: "°", dots: "…", to: "→", parallel: "∥", perp: "⊥", sim: "∼", mid: "∣", ldots: "…",
+  pi: "π", deg: "°", dots: "…", to: "→", parallel: "∥", perp: "⊥", sim: "∼", mid: "∣", ldots: "…", ell: "ℓ", leftrightarrow: "↔",
 };
-const SPACED = new Set(["=", "+", "−", "·", "×", "÷", "±", "≤", "≥", "≠", "≡", "≈", "<", ">", "→", "∥", "⊥", "∼", "∣"]);
+const SPACED = new Set(["=", "+", "−", "·", "×", "÷", "±", "≤", "≥", "≠", "≡", "≈", "<", ">", "→", "∥", "⊥", "∼", "∣", "↔"]);
 
 export function parseMath(src: string): MathNode[] {
   let i = 0;

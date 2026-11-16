@@ -35,7 +35,7 @@ export const CARDS: Card[] = [
     interaction: { kind: "numeric", answer: "125", slips: [slip(60, "That is the count when a digit cannot be reused. Here repeats are allowed, so every slot still has all 5 options."), slip(15, "The three choices are made one after another, so multiply: $5 \\cdot 5 \\cdot 5$.")] },
     feedback: { correct: "Nothing is used up, so every slot has 5 options.", incorrect: "Three slots. Because digits may repeat, choosing one does not remove it: each slot has 5 options." },
     explanation: { summary: "Each of the 3 slots can be any of 5 digits, and choosing a digit does not use it up: $5 \\cdot 5 \\cdot 5 = 125$." },
-    takeaway: "At each slot ask: does the previous choice use up an option, or is it still available?",
+    takeaway: "At each slot, check whether the previous choice used up an option or left it available.",
     whenToUse: "Codes, passwords, arrangements, rankings, outfits.",
     verification: COMPUTED("Enumerates all 3-digit codes over the digits 1 to 5."),
   }),
@@ -307,7 +307,7 @@ export const FAMILIES: CardFamily[] = [
       hint: "Draw one slot per decision. Does a choice use up an option?",
       feedback: { correct: reuse ? "Nothing is used up, so every slot has the same number of options." : "Each place uses up a runner, so the slots shrink by one.", incorrect: reuse ? `${k} slots, each with ${n} options, because shapes may repeat.` : `${k} slots: the first has ${n} options and each later one has one fewer.` },
       explanation: { summary: reuse ? `Each of the ${k} slots has ${n} options: $${Array(k).fill(n).join(" \\cdot ")} = ${ans}$.` : `The slots have $${Array.from({ length: k }, (_, i) => n - i).join(" \\cdot ")} = ${ans}$ options in turn.` },
-      takeaway: "At each slot ask: does the previous choice use up an option, or is it still available?",
+      takeaway: "At each slot, check whether the previous choice used up an option or left it available.",
       whenToUse: "Codes, passwords, arrangements, rankings.",
     };
   }),
