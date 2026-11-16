@@ -1,5 +1,5 @@
-// Expression trees for Module A: parse, print, evaluate. No simplification happens here:
-// the tree is exactly what the student sees, so "x² + 3x + 4x + 12" stays four terms.
+// Expression trees: parse, print, evaluate. No simplification happens here:
+// the tree is exactly what the student typed, so "x² + 3x + 4x + 12" stays four terms.
 
 export type Expr =
   | { k: "num"; n: number; d: number } // rational n/d, d > 0, reduced

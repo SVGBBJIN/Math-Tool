@@ -1,7 +1,6 @@
 // Exact polynomial arithmetic (rational coefficients, any number of variables).
-// Used to BUILD the result of a move (expand, divide out a factor) and by the card
-// verification script as an independent, symbolic check. Move validity itself is decided
-// by numeric evaluation in verify.ts.
+// Decides whether a typed expression equals the expected one (exact, symbolic: no sampling)
+// and whether a factorisation is complete.
 import { add, gcd, mul, neg, num, pow, v, type Expr } from "./ast";
 
 export interface Frac { n: number; d: number }
