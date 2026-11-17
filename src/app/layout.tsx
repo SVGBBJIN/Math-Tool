@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "AMC Coach",
-  description: "Daily AMC 10 training, streaks and accountability.",
+  description: "Three short cards a day to become a better AMC 10 problem solver.",
 };
 
 export const viewport: Viewport = {

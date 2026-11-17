@@ -11,6 +11,11 @@
   --color-muted: #5b6270;
   --color-line: #e3e5ea;
   --color-canvas: #f7f8fa;
+  --color-discover: #1865f2;
+  --color-reinforce: #c27a00;
+  --color-apply: #0e8c6e;
+  --color-paper: #fffdf8;
+  --font-math: "STIX Two Text", "Cambria Math", Cambria, "Times New Roman", Georgia, serif;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
@@ -31,7 +36,7 @@ body {
   }
   /* Bottom tab bar inner row: must match .shell so tabs line up with the content. */
   .shell-nav {
-    @apply mx-auto grid max-w-md grid-cols-6 md:max-w-3xl md:px-8 xl:max-w-5xl;
+    @apply mx-auto grid max-w-md grid-cols-5 md:max-w-3xl md:px-8 xl:max-w-5xl;
   }
   .card {
     @apply rounded-2xl border border-line bg-white p-4 shadow-sm md:p-6;
@@ -57,4 +62,88 @@ body {
   .h2 {
     @apply text-lg font-bold;
   }
+}
+
+/* ---- learning cards ---------------------------------------------------------------- */
+@layer components {
+  .learn-card {
+    @apply rounded-3xl border border-line bg-white p-5 shadow-[0_1px_2px_rgba(33,36,44,0.04),0_8px_24px_-12px_rgba(33,36,44,0.18)] md:p-8;
+  }
+  .role-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide;
+  }
+  .prose-card {
+    @apply text-[17px] leading-relaxed md:text-lg;
+  }
+  .option {
+    @apply flex min-h-12 w-full items-center gap-3 rounded-2xl border-2 border-line bg-white px-4 py-3 text-left transition hover:border-ink/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40;
+  }
+  .option[aria-pressed="true"],
+  .option[aria-checked="true"] {
+    @apply border-brand bg-brand/5;
+  }
+  .answer-input {
+    @apply w-full rounded-2xl border-2 border-line bg-white px-4 py-3 text-xl outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/10;
+    font-family: var(--font-math);
+  }
+  .blank-input {
+    @apply mx-1 inline-block w-20 rounded-lg border-2 border-line bg-white px-2 py-0.5 text-center align-baseline outline-none focus:border-brand;
+    font-family: var(--font-math);
+  }
+  .callout {
+    @apply rounded-2xl p-4 md:p-5;
+  }
+}
+
+.math {
+  font-family: var(--font-math);
+  font-size: 1.08em;
+  white-space: nowrap;
+}
+.math i {
+  font-style: italic;
+  padding-right: 0.04em;
+}
+.math .op {
+  padding: 0 0.22em;
+}
+.math sup,
+.math sub {
+  font-size: 0.72em;
+  line-height: 0;
+}
+.math .frac {
+  display: inline-flex;
+  flex-direction: column;
+  vertical-align: middle;
+  text-align: center;
+  font-size: 0.92em;
+  margin: 0 0.12em;
+}
+.math .frac > span:first-child {
+  border-bottom: 1px solid currentColor;
+  padding: 0 0.2em;
+}
+.math .binom {
+  display: inline-flex;
+  flex-direction: column;
+  vertical-align: middle;
+  text-align: center;
+  font-size: 0.85em;
+  line-height: 1.1;
+}
+.math .radicand {
+  border-top: 1px solid currentColor;
+  padding: 0 0.1em;
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.card-in {
+  animation: card-in 280ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-in { animation: none; }
 }

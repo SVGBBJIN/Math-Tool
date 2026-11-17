@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { GuestProvider } from "@/lib/guest/GuestProvider";
 import { GuestShell } from "./GuestShell";
+import { GuestLearnProvider } from "@/components/learn/GuestLearnProvider";
 
 export const metadata: Metadata = { title: "AMC Coach · Guest" };
 
@@ -8,7 +9,9 @@ export const metadata: Metadata = { title: "AMC Coach · Guest" };
 export default function GuestLayout({ children }: { children: React.ReactNode }) {
   return (
     <GuestProvider>
-      <GuestShell>{children}</GuestShell>
+      <GuestLearnProvider>
+        <GuestShell>{children}</GuestShell>
+      </GuestLearnProvider>
     </GuestProvider>
   );
 }

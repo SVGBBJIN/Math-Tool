@@ -3,8 +3,8 @@ import { ERROR_TYPES, label } from "@/lib/tags";
 import { ERROR_REVIEW_TARGET } from "@/lib/plan";
 import { weekday } from "@/lib/dates";
 import { ReviewClient, type MissRow } from "./ReviewClient";
-import { loadEngineProgress } from "@/lib/data";
-import { engineMissRows, engineReviewCounts } from "@/lib/engine/mistakes";
+import { loadLearnState } from "@/lib/data";
+import { learnMissRows, learnReviewCounts } from "@/lib/learn/misses";
 
 export default async function ErrorsPage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
   const ctx = await requireContext();
@@ -29,7 +29,7 @@ export default async function ErrorsPage({ searchParams }: { searchParams: Promi
     problems: { id: string; source: string; contest: string | null; year: number | null; number: number | null; url: string | null; solution_url: string | null; statement: string | null; answer: string; technique_tags: string[] } | null;
   };
   const reviewBy = new Map((reviews ?? []).map((r) => [r.attempt_id, r]));
-  const engine = await loadEngineProgress(ctx.supabase, student.id);
+  const { state: learn } = await loadLearnState(ctx.supabase, student.id);
   const trainerRows: MissRow[] = ((misses ?? []) as unknown as Raw[]).map((m) => ({
     id: m.id,
     date: m.local_date,
@@ -44,14 +44,14 @@ export default async function ErrorsPage({ searchParams }: { searchParams: Promi
     takeaway: reviewBy.get(m.id)?.takeaway ?? null,
     seconds: m.seconds,
   }));
-  // Misses from move-based practice sit in the same log, oldest first.
-  const rows = [...trainerRows, ...engineMissRows(engine)].sort((a, b) => a.date.localeCompare(b.date));
-  const engineFresh = engine.logs.length;
+  // Misses from the learning cards sit in the same log, oldest first.
+  const rows = [...trainerRows, ...learnMissRows(learn)].sort((a, b) => a.date.localeCompare(b.date));
+  const engineFresh = learn.events.filter((e) => e.dimension !== "comprehension" && !e.legacy).length;
 
   const unfamiliarMisses = rows.filter((r) => !r.familiar);
   const counts = Object.fromEntries(ERROR_TYPES.map((e) => [e.value, unfamiliarMisses.filter((r) => r.errorType === e.value).length]));
   const carelessShare = unfamiliarMisses.length ? Math.round(((counts.careless ?? 0) + (counts.misread ?? 0)) / unfamiliarMisses.length * 100) : 0;
-  const reviewedToday = (reviews ?? []).filter((r) => r.local_date === ctx.today).length + engineReviewCounts(engine, ctx.today).reviewedToday;
+  const reviewedToday = (reviews ?? []).filter((r) => r.local_date === ctx.today).length + learnReviewCounts(learn, ctx.today).reviewedToday;
   const pending = rows.filter((r) => !r.takeaway);
   const shown = type ? rows.filter((r) => r.errorType === type) : rows;
   const isWednesday = weekday(ctx.today) === 3;

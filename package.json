@@ -9,7 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run tests/*.test.ts",
+    "test": "vitest run tests/*.test.ts tests/learn",
     "test:db": "node --env-file=.env.local ./node_modules/vitest/vitest.mjs run tests/db",
     "typecheck": "tsc --noEmit",
     "seed:demo": "node --env-file=.env.local scripts/seed-demo.mjs",

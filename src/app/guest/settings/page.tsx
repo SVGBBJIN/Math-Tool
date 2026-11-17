@@ -5,9 +5,12 @@ import { useGuest } from "@/lib/guest/GuestProvider";
 import { updateSettings } from "@/lib/guest/engine";
 import type { FormState } from "../../actions/account";
 import { HouseholdForm } from "../../(app)/settings/SettingsForms";
+import { useGuestLearn } from "@/components/learn/GuestLearnProvider";
+import { toEnvelope } from "@/lib/learn/persistence";
 
 export default function GuestSettings() {
   const { state, update, reset, restore } = useGuest();
+  const learn = useGuestLearn();
   const [msg, setMsg] = useState<FormState>({});
   const fileRef = useRef<HTMLInputElement>(null);
   if (!state) return <p className="card text-muted">Loading…</p>;
@@ -25,7 +28,9 @@ export default function GuestSettings() {
   };
 
   const exportBackup = () => {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }));
+    // One file holds everything: the guest data and the learning record.
+    const file = { ...state, learn: learn ? toEnvelope(learn.store.state) : undefined };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(file, null, 2)], { type: "application/json" }));
     const a = document.createElement("a");
     a.href = url;
     a.download = `amc-coach-guest-${new Date().toISOString().slice(0, 10)}.json`;
@@ -35,8 +40,24 @@ export default function GuestSettings() {
 
   const importBackup = async (file: File | undefined) => {
     if (!file) return;
-    const r = restore(await file.text());
-    setMsg(r.error ? { error: r.error } : { message: "Backup restored." });
+    const text = await file.text();
+    let parsed: Record<string, unknown> | null = null;
+    try { parsed = JSON.parse(text); } catch { /* reported below */ }
+    if (!parsed || typeof parsed !== "object") {
+      setMsg({ error: "Couldn't read that file." });
+    } else {
+      const { learn: learnPart, ...guestPart } = parsed;
+      // A learning-only backup is accepted too.
+      const learnOnly = (parsed as { kind?: string }).kind === "learn";
+      let error: string | undefined;
+      if (!learnOnly) error = restore(JSON.stringify(guestPart)).error;
+      if (!error && (learnPart || learnOnly) && learn) {
+        const r = await learn.repo.importBackup(JSON.stringify(learnOnly ? parsed : learnPart));
+        if (r.ok) learn.replace(r.state);
+        else error = r.error;
+      }
+      setMsg(error ? { error } : { message: "Backup restored." });
+    }
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -70,8 +91,9 @@ export default function GuestSettings() {
         <button
           className="w-full text-sm font-semibold text-danger"
           onClick={() => {
-            if (confirm("Erase all guest progress and problems in this browser and start over with the sample problems?")) {
+            if (confirm("Erase all guest progress and problems in this browser and start over? A copy of your learning record is kept as a local backup.")) {
               reset();
+              if (learn) void learn.repo.reset().then((fresh) => learn.replace(fresh));
               setMsg({ message: "Reset." });
             }
           }}
