@@ -2,7 +2,7 @@
 // The curriculum as a map of ideas: every concept, its state, and what it would take to
 // move it. Any concept with cards can be practised from here, including ones that are not
 // yet in the daily plan.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cardsOf, getCard, hasCards } from "@/lib/learn/cards";
 import { COURSE, conceptOf, dependentsOf, type Concept } from "@/lib/learn/curriculum";
 import { STANDARD, STATE_MEANING, snapshots, type ConceptSnapshot } from "@/lib/learn/mastery";
@@ -25,8 +25,8 @@ function Meter({ label, have, want }: { label: string; have: number; want: numbe
   );
 }
 
-function ConceptSheet({ concept, snap, snaps, store, today, readOnly, onClose }: {
-  concept: Concept; snap: ConceptSnapshot; snaps: Map<string, ConceptSnapshot>; store: LearnStore; today: string; readOnly: boolean; onClose: () => void;
+function ConceptSheet({ concept, snap, store, today, readOnly, onClose }: {
+  concept: Concept; snap: ConceptSnapshot; store: LearnStore; today: string; readOnly: boolean; onClose: () => void;
 }) {
   const [card, setCard] = useState<Pick | null>(null);
   const [done, setDone] = useState(0);
@@ -39,9 +39,12 @@ function ConceptSheet({ concept, snap, snaps, store, today, readOnly, onClose }:
     return es.some((e) => e.outcome === "correct") ? "shown" : "attempted";
   };
   const start = () => { setCard(nextInConcept(store.state, concept.id, today)); };
+  const ref = useRef<HTMLElement>(null);
+  // The sheet sits above the map; bring it into view when a concept is tapped further down.
+  useEffect(() => { ref.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, []);
 
   return (
-    <section className="learn-card card-in space-y-4" aria-labelledby={`c-${concept.id}`}>
+    <section ref={ref} className="learn-card card-in scroll-mt-4 space-y-4" aria-labelledby={`c-${concept.id}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">{COURSE.domains.find((d) => d.id === concept.domain)?.name}</p>
@@ -137,7 +140,7 @@ export function MapView({ store, today, readOnly = false }: { store: LearnStore;
         </section>
       )}
 
-      {openConcept && <ConceptSheet key={openConcept.id} concept={openConcept} snap={snaps.get(openConcept.id)!} snaps={snaps} store={store} today={today} readOnly={readOnly} onClose={() => setOpen(null)} />}
+      {openConcept && <ConceptSheet key={openConcept.id} concept={openConcept} snap={snaps.get(openConcept.id)!} store={store} today={today} readOnly={readOnly} onClose={() => setOpen(null)} />}
 
       {COURSE.domains.map((d) => (
         <section key={d.id} className="space-y-3">

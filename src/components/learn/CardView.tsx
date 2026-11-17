@@ -70,6 +70,8 @@ export function CardView({ card, slot, reason, onRecord, onNext, nextLabel = "Ne
   };
 
   const showMe = () => {
+    // After a wrong attempt this is a miss, not a skip: the attempt was real.
+    if (phase === "retry" && result) return finish("incorrect", attempts, result);
     setSkipped(true);
     finish("skipped", attempts, null);
   };

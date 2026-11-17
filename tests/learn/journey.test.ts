@@ -7,7 +7,7 @@ import { snapshots } from "@/lib/learn/mastery";
 import { scheduleOf } from "@/lib/learn/review";
 import { buildDaily, dailyStatus, ensureDaily } from "@/lib/learn/select";
 import { localRepository, memoryStore } from "@/lib/learn/persistence";
-import { emptyLearnState, type LearnState } from "@/lib/learn/state";
+import type { LearnState } from "@/lib/learn/state";
 import { DAY0, answer } from "./helpers";
 
 it("first visit → insight → technique → reinforcement → application → mastery → review after a break", async () => {

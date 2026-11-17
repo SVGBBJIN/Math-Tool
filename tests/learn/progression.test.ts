@@ -207,3 +207,15 @@ describe("daily selection", () => {
     expect(nextInConcept(s, "alg.functions", DAY0)).toBeNull(); // no cards written yet
   });
 });
+
+describe("what the student is told after a card", () => {
+  it("reports a move up as progress and a drop as a drop", async () => {
+    const { recordCard } = await import("@/components/learn/practice");
+    let state = emptyLearnState();
+    const store = { get state() { return state; }, update: (fn: (s: LearnState) => LearnState) => (state = fn(state)) };
+    const r1 = recordCard(store, { cardId: "nt.divisibility.i1", slot: "discover", outcome: "correct", attempts: 1, hintUsed: false, selfReported: false, answered: "x" }, DAY0);
+    expect(r1.messages.join(" ")).toMatch(/Multiples and divisibility: now Developing/);
+    expect(r1.messages.join(" ")).toMatch(/Unlocked: Remainders/);
+    expect(r1.messages.join(" ")).not.toMatch(/back to/);
+  });
+});

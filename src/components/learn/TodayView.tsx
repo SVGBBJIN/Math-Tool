@@ -20,7 +20,7 @@ const weekday = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en
 export function TodayView({ store, today, mapHref }: { store: LearnStore; today: string; mapHref: string }) {
   const { state, update } = store;
   useEffect(() => { update((s) => ensureDaily(s, today)); }, [update, today]);
-  const slots = state.daily?.date === today ? state.daily.slots : [];
+  const slots = useMemo(() => (state.daily?.date === today ? state.daily.slots : []), [state.daily, today]);
   const status = dailyStatus(state, today);
   // The card being looked at. It stays open after it is answered, until "Next".
   const [open, setOpen] = useState<string | null>(null);
@@ -65,8 +65,8 @@ export function TodayView({ store, today, mapHref }: { store: LearnStore; today:
           }
           return (
             <li key={slot.cardId} className={`flex items-center gap-3 rounded-2xl border px-4 py-3 ${slot.done ? "border-line bg-white" : "border-dashed border-line"}`}>
-              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${slot.done ? (slot.outcome === "correct" ? "bg-apply text-white" : "bg-reinforce/15 text-reinforce") : "bg-canvas text-muted"}`} aria-hidden>
-                {slot.done ? (slot.outcome === "correct" ? "✓" : "·") : k + 1}
+              <span title={slot.done && slot.outcome !== "correct" ? "This idea comes back soon" : undefined} className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${slot.done ? (slot.outcome === "correct" ? "bg-apply text-white" : "bg-reinforce/15 text-reinforce") : "bg-canvas text-muted"}`} aria-hidden>
+                {slot.done ? (slot.outcome === "correct" ? "✓" : "↻") : k + 1}
               </span>
               <div className="min-w-0 flex-1">
                 <RoleChip slot={slot.role} />
