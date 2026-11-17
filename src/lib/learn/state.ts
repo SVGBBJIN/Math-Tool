@@ -31,7 +31,7 @@ export interface Evidence {
   slot: Slot;
   /** Days since this concept was last practised, or null on first contact. */
   gapDays: number | null;
-  /** The same problem (family) was answered within the repeat window, so recall may be standing in for reasoning. */
+  /** The same problem was answered recently (or a same-structure variant very recently), so recall may be standing in for reasoning. */
   repeat: boolean;
   /** Imported from the earlier move-based engine. Counts as exposure, never as clean evidence. */
   legacy?: boolean;

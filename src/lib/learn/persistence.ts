@@ -57,14 +57,15 @@ export function parseDocument(raw: unknown): ParseResult {
   if (env.kind === "learn" && "state" in env) doc = env.state;
   if (!doc || typeof doc !== "object") return { ok: false, reason: "not a learning record" };
 
-  let version = (doc as Record<string, unknown>).v;
-  if (typeof version !== "number") return { ok: false, reason: "no version number" };
+  const v0 = (doc as Record<string, unknown>).v;
+  if (typeof v0 !== "number") return { ok: false, reason: "no version number" };
+  let version: number = v0;
   if (version > LEARN_VERSION) return { ok: false, reason: `saved by a newer version of the app (v${version})` };
   if (version === 1 && !isLegacyDocument(doc)) return { ok: false, reason: "not a learning record" };
   const from = version;
   let dropped = 0;
   while (version < LEARN_VERSION) {
-    const step = MIGRATIONS[version as number];
+    const step = MIGRATIONS[version];
     if (!step) return { ok: false, reason: `no migration from v${version}` };
     const r = step(doc);
     doc = r.doc;

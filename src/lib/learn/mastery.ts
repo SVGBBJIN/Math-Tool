@@ -15,7 +15,8 @@
 //               days, at least one after 7+ days and at least one on an application or variation.
 //
 // "Clean" is what separates evidence from completion: right on the first attempt, no hint,
-// checked by the app (not self-judged), and not a problem seen in the last two weeks.
+// checked by the app (not self-judged), and not the same problem seen in the last two weeks
+// (or a same-structure variant in the last three days).
 // A right answer that is not clean still counts as exposure; it never counts towards the
 // thresholds above. Recent misses cap a concept at Developing until a clean success returns.
 import { cardsOf, hasCards } from "./cards";
@@ -36,8 +37,10 @@ export const STANDARD = {
   retentionGap: 3,
   longGap: 7,
   retentions: 2,
-  /** A problem answered within this many days is a repeat: recall, not fresh reasoning. */
+  /** The identical problem answered within this many days is a repeat: recall, not fresh reasoning. */
   repeatWindow: 14,
+  /** A variant of the same problem (new numbers, same structure) within this many days is too familiar to count. */
+  familiarWindow: 3,
   /** A required prerequisite must reach this state before the daily plan starts a concept. */
   unlockAt: "developing" as MasteryState,
 } as const;

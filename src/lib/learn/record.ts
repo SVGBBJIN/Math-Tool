@@ -37,13 +37,14 @@ export function recordResult(state: LearnState, result: CardResult, today: strin
 
   const previous = state.events.filter((e) => e.conceptId === card.conceptId);
   const last = previous[previous.length - 1];
-  const lastSame = [...state.events].reverse().find((e) => e.family === family);
+  const lastCard = [...state.events].reverse().find((e) => e.cardId === card.id);
+  const lastFamily = [...state.events].reverse().find((e) => e.family === family);
   const evidence: Evidence = {
     id: newId(now), at: now.toISOString(), date: today,
     cardId: card.id, family, conceptId: card.conceptId, objectiveId: card.objectiveId, dimension: DIMENSION_OF[card.type],
     outcome: result.outcome, attempts: Math.max(0, Math.min(2, Math.round(result.attempts))), hintUsed: result.hintUsed, selfReported: result.selfReported, slot: result.slot,
     gapDays: last ? Math.max(0, daysBetween(last.date, today)) : null,
-    repeat: !!lastSame && daysBetween(lastSame.date, today) < STANDARD.repeatWindow,
+    repeat: (!!lastCard && daysBetween(lastCard.date, today) < STANDARD.repeatWindow) || (!!lastFamily && daysBetween(lastFamily.date, today) < STANDARD.familiarWindow),
   };
 
   let next: LearnState = { ...state, events: [...state.events, evidence].slice(-MAX_EVENTS) };
