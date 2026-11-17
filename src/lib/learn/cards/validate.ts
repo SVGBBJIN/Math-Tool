@@ -238,7 +238,7 @@ export function validateCard(card: Card, verifier?: () => string | string[]): st
 }
 
 function validateFamily(f: CardFamily, problems: Problem[]): number {
-  const verify: ((p: Record<string, number>) => string) | undefined = FAMILY_VERIFIERS[f.id];
+  const verify = (FAMILY_VERIFIERS as Record<string, ((p: Record<string, number>) => string) | undefined>)[f.id];
   if (!verify) problems.push({ card: f.id, problem: "family has no independent verifier" });
   if (!conceptOf(f.conceptId) || !hasCards(f.conceptId)) problems.push({ card: f.id, problem: "family belongs to a concept with no hand-written cards" });
   const prompts = new Set<string>();
