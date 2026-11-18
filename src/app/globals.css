@@ -15,14 +15,30 @@
   --color-reinforce: #c27a00;
   --color-apply: #0e8c6e;
   --color-paper: #fffdf8;
+  /* Bright accents. Each problem domain has its own color. */
+  --color-violet: #7c3aed;
+  --color-pink: #e0267d;
+  --color-sun: #f5a300;
+  --color-sky: #0ea5e9;
+  --color-alg: #7c3aed;
+  --color-nt: #047857;
+  --color-cp: #c2410c;
+  --color-geo: #0369a1;
   --font-math: "STIX Two Text", "Cambria Math", Cambria, "Times New Roman", Georgia, serif;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 html,
 body {
-  background: var(--color-canvas);
+  background-color: #f6f5fd;
   color: var(--color-ink);
+}
+body {
+  background-image:
+    radial-gradient(900px 520px at -5% -8%, rgba(124, 58, 237, 0.14), transparent 60%),
+    radial-gradient(800px 480px at 105% 0%, rgba(224, 38, 125, 0.11), transparent 60%),
+    radial-gradient(900px 600px at 50% 110%, rgba(14, 165, 233, 0.12), transparent 60%);
+  background-attachment: fixed;
 }
 
 /* Shared primitives */
@@ -42,10 +58,15 @@ body {
     @apply rounded-2xl border border-line bg-white p-4 shadow-sm md:p-6;
   }
   .btn {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2 font-semibold text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 font-semibold text-white shadow-[0_6px_16px_-8px_rgba(79,70,229,0.7)] transition hover:-translate-y-px hover:brightness-110 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0;
+    background-image: linear-gradient(135deg, var(--color-brand), var(--color-violet));
   }
   .btn-ghost {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line bg-white px-4 py-2 font-semibold text-ink transition hover:bg-canvas disabled:opacity-50;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border-2 border-violet/20 bg-white px-4 py-2 font-semibold text-violet transition hover:border-violet/50 hover:bg-violet/5 disabled:opacity-50;
+  }
+  .brand-text {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(90deg, var(--color-brand), var(--color-violet) 55%, var(--color-pink));
   }
   .input {
     @apply w-full rounded-xl border border-line bg-white px-3 py-2 text-base outline-none focus:border-brand focus:ring-2 focus:ring-brand/20;
@@ -67,8 +88,19 @@ body {
 /* ---- learning cards ---------------------------------------------------------------- */
 @layer components {
   .learn-card {
-    @apply rounded-3xl border border-line bg-white p-5 shadow-[0_1px_2px_rgba(33,36,44,0.04),0_8px_24px_-12px_rgba(33,36,44,0.18)] md:p-8;
+    @apply relative overflow-hidden rounded-3xl border border-white bg-white p-5 shadow-[0_1px_2px_rgba(33,36,44,0.04),0_12px_32px_-14px_rgba(76,29,149,0.28)] md:p-8;
   }
+  /* A colored band across the top of a card, by its role. */
+  .learn-card[data-role]::before {
+    content: "";
+    @apply absolute inset-x-0 top-0 h-1.5;
+    background-image: linear-gradient(90deg, var(--band-a), var(--band-b));
+  }
+  .learn-card[data-role="discover"] { --band-a: var(--color-brand); --band-b: var(--color-sky); }
+  .learn-card[data-role="reinforce"] { --band-a: var(--color-sun); --band-b: var(--color-pink); }
+  .learn-card[data-role="apply"] { --band-a: var(--color-mastery); --band-b: var(--color-apply); }
+  .learn-card[data-role="extra"],
+  .learn-card[data-role="explore"] { --band-a: var(--color-violet); --band-b: var(--color-pink); }
   .role-chip {
     @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide;
   }
@@ -81,6 +113,23 @@ body {
   .option[aria-pressed="true"],
   .option[aria-checked="true"] {
     @apply border-brand bg-brand/5;
+  }
+  /* Daily Problem: everything reads its color from --dom (set per domain). */
+  .problem-card {
+    @apply relative overflow-hidden rounded-3xl bg-white shadow-[0_14px_36px_-16px_rgba(76,29,149,0.35)] ring-1 ring-black/5;
+  }
+  .problem-band {
+    @apply px-5 pb-5 pt-4 text-white md:px-8 md:pt-6;
+    background-image: linear-gradient(125deg, var(--dom), var(--dom2, var(--dom)));
+  }
+  .step-panel {
+    @apply rounded-2xl border-2 p-4 md:p-5;
+  }
+  .amc-choice {
+    @apply flex min-h-12 items-center gap-2 rounded-2xl border-2 border-line bg-white px-3 py-2 text-left font-semibold transition hover:-translate-y-px hover:border-[var(--dom)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--dom)]/40;
+  }
+  .amc-choice[aria-checked="true"] {
+    @apply border-[var(--dom)] bg-[color-mix(in_srgb,var(--dom)_8%,white)];
   }
   .answer-input {
     @apply w-full rounded-2xl border-2 border-line bg-white px-4 py-3 text-xl outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/10;
@@ -144,6 +193,22 @@ body {
 .card-in {
   animation: card-in 280ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
+@keyframes pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.pop { animation: pop 360ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--dom, #1865f2) 45%, transparent); }
+  50% { box-shadow: 0 0 0 6px transparent; }
+}
+.pulse-ring { animation: pulse-ring 1.8s ease-in-out infinite; }
+@keyframes confetti-fall {
+  from { transform: translateY(-20px) rotate(0); opacity: 1; }
+  to { transform: translateY(140px) rotate(540deg); opacity: 0; }
+}
+.confetti { animation: confetti-fall 1.4s ease-in both; }
 @media (prefers-reduced-motion: reduce) {
-  .card-in { animation: none; }
+  .card-in, .pop, .pulse-ring, .confetti { animation: none; }
 }

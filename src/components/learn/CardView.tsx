@@ -80,7 +80,7 @@ export function CardView({ card, slot, reason, onRecord, onNext, nextLabel = "Ne
   const correct = done && result?.status === "correct";
 
   return (
-    <article className="learn-card card-in" aria-live="polite">
+    <article className="learn-card card-in" data-role={slot} aria-live="polite">
       <header className="mb-4 flex flex-wrap items-center gap-2">
         <RoleChip slot={slot} type={card.type} />
         {reason && <span className="text-xs text-muted">{reason}</span>}
@@ -181,7 +181,7 @@ export function CardView({ card, slot, reason, onRecord, onNext, nextLabel = "Ne
             )}
           </div>
 
-          <div className="rounded-2xl bg-ink px-5 py-4 text-white">
+          <div className="rounded-2xl px-5 py-4 text-white" style={{ backgroundImage: "linear-gradient(135deg, #312e81, var(--color-violet) 65%, var(--color-pink))" }}>
             <p className="text-xs font-bold uppercase tracking-wide text-white/60">Remember</p>
             <p className="mt-1 text-lg font-semibold leading-snug"><Rich text={card.takeaway} /></p>
             <p className="mt-2 text-sm text-white/75"><span className="font-semibold text-white/90">Use it when: </span><Rich text={card.whenToUse} /></p>

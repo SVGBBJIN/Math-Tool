@@ -8,7 +8,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="shell">
       <header className="shell-header">
         <div>
-          <p className="text-lg font-extrabold tracking-tight text-brand">AMC Coach</p>
+          <p className="brand-text text-xl font-black tracking-tight">AMC Coach</p>
           <p className="text-xs text-muted">
             {profile.display_name} · {profile.role} · {household.timezone}
           </p>

@@ -16,7 +16,7 @@ export function GuestShell({ children }: { children: React.ReactNode }) {
     <div className="shell">
       <header className="shell-header">
         <div>
-          <p className="text-lg font-extrabold tracking-tight text-brand">AMC Coach</p>
+          <p className="brand-text text-xl font-black tracking-tight">AMC Coach</p>
           <p className="text-xs text-muted">Guest · saved in this browser{state ? ` · ${state.settings.timezone}` : ""}</p>
         </div>
         <Link href="/login" className="text-sm font-semibold text-muted hover:text-ink">Sign in</Link>
