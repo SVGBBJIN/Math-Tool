@@ -14,6 +14,9 @@ import { RoleChip } from "./bits";
 import { recordCard, tagMiss } from "./practice";
 import type { LearnStore } from "./useLearnStore";
 import { ProgressSummary } from "./ProgressSummary";
+import { DailyProblemView } from "./DailyProblemView";
+
+const ROLE_DOT = { discover: "bg-brand/10 text-brand", reinforce: "bg-sun/15 text-[#9a6700]", apply: "bg-mastery/15 text-apply" } as const;
 
 const weekday = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
 
@@ -43,9 +46,9 @@ export function TodayView({ store, today, mapHref }: { store: LearnStore; today:
       <header className="flex items-end justify-between gap-3 px-1">
         <div>
           <p className="text-sm font-semibold text-muted">{weekday(today)}</p>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{status.complete ? "Today's three: done" : "Today's three"}</h1>
+          <h1 className="brand-text text-3xl font-extrabold tracking-tight md:text-4xl">{status.complete ? "Today's three: done" : "Today's three"}</h1>
         </div>
-        <p className="text-sm text-muted">{status.complete ? `${status.total} of ${status.total}` : `about ${Math.max(1, Math.round(seconds / 60 * 2) / 2)} min left`}</p>
+        <p className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-violet shadow-sm ring-1 ring-violet/15">{status.complete ? `${status.total} of ${status.total}` : `about ${Math.max(1, Math.round(seconds / 60 * 2) / 2)} min left`}</p>
       </header>
 
       <ol className="space-y-3">
@@ -64,8 +67,8 @@ export function TodayView({ store, today, mapHref }: { store: LearnStore; today:
             );
           }
           return (
-            <li key={slot.cardId} className={`flex items-center gap-3 rounded-2xl border px-4 py-3 ${slot.done ? "border-line bg-white" : "border-dashed border-line"}`}>
-              <span title={slot.done && slot.outcome !== "correct" ? "This idea comes back soon" : undefined} className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${slot.done ? (slot.outcome === "correct" ? "bg-apply text-white" : "bg-reinforce/15 text-reinforce") : "bg-canvas text-muted"}`} aria-hidden>
+            <li key={slot.cardId} className={`flex items-center gap-3 rounded-2xl border px-4 py-3 ${slot.done ? "border-white bg-white shadow-sm" : "border-dashed border-violet/25 bg-white/60"}`}>
+              <span title={slot.done && slot.outcome !== "correct" ? "This idea comes back soon" : undefined} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${slot.done ? (slot.outcome === "correct" ? "bg-mastery text-white" : "bg-sun/20 text-[#9a6700]") : ROLE_DOT[slot.role]}`} aria-hidden>
                 {slot.done ? (slot.outcome === "correct" ? "✓" : "↻") : k + 1}
               </span>
               <div className="min-w-0 flex-1">
@@ -102,6 +105,8 @@ export function TodayView({ store, today, mapHref }: { store: LearnStore; today:
           {extraDone > 0 && !extra && <p className="mt-2 text-xs text-muted">{extraDone} extra card{extraDone === 1 ? "" : "s"} today. Stopping here is fine: spacing helps more than volume.</p>}
         </section>
       )}
+
+      <DailyProblemView store={store} today={today} />
 
       <ProgressSummary snaps={snaps} events={state.events} mapHref={mapHref} />
     </div>

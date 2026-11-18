@@ -4,11 +4,11 @@ import { STATE_LABEL, type MasteryState } from "@/lib/learn/mastery";
 import type { Slot } from "@/lib/learn/state";
 
 const ROLE: Record<Slot, { label: string; cls: string }> = {
-  discover: { label: "Discover", cls: "bg-discover/10 text-discover" },
-  reinforce: { label: "Reinforce", cls: "bg-reinforce/10 text-reinforce" },
-  apply: { label: "Apply", cls: "bg-apply/10 text-apply" },
-  extra: { label: "One more", cls: "bg-canvas text-muted" },
-  explore: { label: "Practice", cls: "bg-canvas text-muted" },
+  discover: { label: "Discover", cls: "bg-brand/12 text-brand" },
+  reinforce: { label: "Reinforce", cls: "bg-sun/18 text-[#9a6700]" },
+  apply: { label: "Apply", cls: "bg-mastery/15 text-apply" },
+  extra: { label: "One more", cls: "bg-violet/12 text-violet" },
+  explore: { label: "Practice", cls: "bg-pink/10 text-pink" },
 };
 const TYPE_LABEL: Record<CardType, string> = { insight: "Insight", technique: "Technique", recognition: "Recognise", application: "Apply it", variation: "Variation" };
 

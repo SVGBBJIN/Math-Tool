@@ -12,6 +12,7 @@ import { z } from "zod";
 import { getCard } from "./cards";
 import { conceptOf } from "./curriculum";
 import { isLegacyDocument, migrateLegacy } from "./legacy";
+import { getProblem, PROBLEM_HISTORY_DAYS } from "./problems";
 import { LEARN_VERSION, MAX_EVENTS, emptyLearnState, type LearnState } from "./state";
 
 export const STORAGE_PREFIX = "amc-coach:learn";
@@ -34,6 +35,12 @@ const SlotSchema = z.object({
 const MissSchema = z.object({
   id: z.string().min(1), at: z.string(), date, cardId: z.string(), conceptId: z.string(), problem: z.string(), userAnswer: z.string(), correctAnswer: z.string(),
   outcome: z.enum(["incorrect", "skipped"]), errorType: z.string().nullable(), note: z.string(), takeaway: z.string().nullable(), reviewedOn: z.string().nullable(),
+});
+
+const ProblemDaySchema = z.object({
+  date, problemId: z.string().min(1), mode: z.enum(["full", "part"]),
+  steps: z.array(z.object({ status: z.enum(["open", "solved", "shown"]), tries: z.number().int().min(0).max(1000), hint: z.boolean() })).max(20),
+  done: z.boolean(), outcome: z.enum(["clean", "solved", "shown"]).nullable(),
 });
 
 export type ParseResult =
@@ -89,9 +96,18 @@ export function parseDocument(raw: unknown): ParseResult {
   // A plan that points at cards which no longer exist is discarded; it is rebuilt on open.
   if (d.success && d.data.slots.every((s) => getCard(s.cardId))) daily = d.data;
 
+  // The Daily Problem history arrived after v2 shipped, so older documents simply have none.
+  // Entries for problems that no longer exist (or whose steps changed) are dropped.
+  const rawDays = Array.isArray(o.problemDays) ? o.problemDays : [];
+  const problemDays = rawDays.flatMap((d) => {
+    const r = ProblemDaySchema.safeParse(d);
+    return r.success && getProblem(r.data.problemId)?.steps.length === r.data.steps.length ? [r.data] : [];
+  }).sort((a, b) => a.date.localeCompare(b.date)).slice(-PROBLEM_HISTORY_DAYS);
+  dropped += rawDays.length - problemDays.length;
+
   return {
     ok: true,
-    state: { v: LEARN_VERSION, createdAt: typeof o.createdAt === "string" ? o.createdAt : new Date().toISOString(), events: unique.slice(-MAX_EVENTS), daily, misses },
+    state: { v: LEARN_VERSION, createdAt: typeof o.createdAt === "string" ? o.createdAt : new Date().toISOString(), events: unique.slice(-MAX_EVENTS), daily, misses, problemDays },
     migratedFrom: from < LEARN_VERSION ? from : null,
     dropped,
   };

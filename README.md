@@ -1,6 +1,6 @@
 # AMC Coach
 
-Three short cards a day to become a better AMC 10 problem solver, plus a problem bank, error log and accountability
+Three short cards and one step-by-step problem a day to become a better AMC 10 problem solver, plus a problem bank, error log and accountability
 tools for one family. Next.js (App Router, TypeScript) · Supabase (Postgres, auth, storage) · Vercel · Sendblue · Anthropic API.
 
 ## Status
@@ -9,6 +9,7 @@ tools for one family. Next.js (App Router, TypeScript) · Supabase (Postgres, au
 |---|---|---|
 | **M1** | Schema, auth, problem bank, trainer (since replaced by Learn), error log | ✅ built, tested |
 | **Learn** | Concept curriculum, card system, mastery and review engines (see below) | ✅ built, tested; Supabase path not yet run against a live database |
+| **Daily Problem** | One step-by-step contest-style problem a day, verified bank (see below) | ✅ built, tested in guest mode |
 | M2 | Sendblue sending, scheduler, inbound webhook, escalation tests | next |
 | M3 | Khan Academy proof entry | |
 | M4 | Endurance mode + vault | |
@@ -87,6 +88,33 @@ all progress lives in the browser's `localStorage` (`src/lib/guest`), and the mi
   their reviews are kept and still appear in the error log.
 - **Error log.** All misses, with counts by error type and the share of careless + misread misses. Wednesday review:
   write a "next time I will…" takeaway for 5 misses (or all remaining) to complete the day.
+
+## The Daily Problem
+
+Below Today's three, one contest-style problem a day, solved Khan Academy style: the problem stays on screen and is
+broken into small steps, each with its own answer box, a **Hint** and **Show me this step**. A wrong answer gets
+feedback (specific to common slips where known) and you can try again as often as you like; the next step unlocks once
+this one is solved or shown. The final step offers five choices, (A) to (E). Code: `src/lib/learn/problems` (pure
+logic), `src/components/learn/DailyProblemView.tsx` (UI), tests in `tests/learn/daily-problem.test.ts`.
+
+- **Two kinds of day, alternating.** *Full solve*: you answer every step. *Solve one part*: the steps before the key
+  step are worked for you, you solve the key step, and the rest of the solution is then shown.
+- **Bank.** 19 original problems across algebra, number theory, counting & probability and geometry (5/4/5/5). Nine
+  are families that generate fresh numbers, so a problem can come back without repeating. No real contest problems or
+  names (checked).
+- **Selection.** The domain practised least recently goes next (so any four days cover all four), and within it the
+  problem seen longest ago. A problem comes back after at least 16 days.
+- **Verification.** Every computable step is recomputed by an independent function in `problems/verifiers.ts` (brute
+  force, enumeration, or coordinates for geometry) and the build fails on any difference (`npm run verify:cards`, also
+  over 30 seeds per family). The final choices must be five different values in increasing order with the key appearing
+  once; the checker must accept every key and reject every listed slip.
+- **Outcome.** *Clean* (every step you owned right first time, no hints), *solved* (with retries or hints) or *shown*.
+  The finish panel shows the takeaway and your last 7 days.
+- **Storage.** `problemDays` in the learning record (last 180 days), validated on load; older records simply start
+  with none. It is kept apart from the evidence log, so the Daily Problem does **not** move concept mastery.
+
+**Add a problem.** Add it to `problems/bank.ts` (or a family with `problemFamily`), add an independent verifier
+keyed by its id in `problems/verifiers.ts`, and run `npm run verify:cards`.
 
 ## Decisions & caveats
 

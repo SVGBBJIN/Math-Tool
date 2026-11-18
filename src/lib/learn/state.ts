@@ -2,6 +2,7 @@
 // Everything else (mastery states, review dates, what to show next) is DERIVED from the
 // evidence log by pure functions, so there is one source of truth and nothing to keep in sync.
 import type { Dimension } from "./cards/types";
+import type { ProblemDay } from "./problems/types";
 
 /** Version of the stored document. 1 was the move-based engine's progress; 2 is this. */
 export const LEARN_VERSION = 2;
@@ -73,10 +74,12 @@ export interface LearnState {
   events: Evidence[];
   daily: DailyPlan | null;
   misses: Miss[];
+  /** The Daily Problem, one entry per day it was opened (see ./problems). Kept apart from the evidence log. */
+  problemDays: ProblemDay[];
 }
 
 export function emptyLearnState(now: Date = new Date()): LearnState {
-  return { v: LEARN_VERSION, createdAt: now.toISOString(), events: [], daily: null, misses: [] };
+  return { v: LEARN_VERSION, createdAt: now.toISOString(), events: [], daily: null, misses: [], problemDays: [] };
 }
 
 let counter = 0;

@@ -31,10 +31,10 @@ export function progressFacts(snaps: Map<string, ConceptSnapshot>, events: Evide
 export function ProgressSummary({ snaps, events, mapHref }: { snaps: Map<string, ConceptSnapshot>; events: Evidence[]; mapHref: string }) {
   const f = progressFacts(snaps, events);
   if (!f.discovered) return null;
-  const stat = (n: number, label: string) => (
-    <div className="rounded-2xl bg-white px-3 py-3 text-center ring-1 ring-line">
-      <p className="text-2xl font-bold">{n}</p>
-      <p className="text-xs font-medium text-muted">{label}</p>
+  const stat = (n: number, label: string, from: string, to: string) => (
+    <div className="rounded-2xl px-3 py-3 text-center text-white shadow-sm" style={{ backgroundImage: `linear-gradient(135deg, ${from}, ${to})` }}>
+      <p className="text-2xl font-extrabold">{n}</p>
+      <p className="text-xs font-semibold text-white/85">{label}</p>
     </div>
   );
   return (
@@ -44,9 +44,9 @@ export function ProgressSummary({ snaps, events, mapHref }: { snaps: Map<string,
         <Link href={mapHref} className="text-sm font-semibold text-brand">Full map →</Link>
       </div>
       <div className="grid grid-cols-3 gap-2">
-        {stat(f.discovered, "ideas met")}
-        {stat(f.developing.length, "being built")}
-        {stat(f.solid.length, "solid")}
+        {stat(f.discovered, "ideas met", "var(--color-brand)", "#0369a1")}
+        {stat(f.developing.length, "being built", "var(--color-violet)", "#be185d")}
+        {stat(f.solid.length, "solid", "var(--color-apply)", "#0f766e")}
       </div>
       {f.reinforce.length > 0 && (
         <p className="rounded-2xl border border-reinforce/30 bg-reinforce/5 px-4 py-3 text-sm">
