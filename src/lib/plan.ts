@@ -10,7 +10,7 @@ export const PLAN_LABELS: Record<PlanItem, string> = {
   saturday_review: "Review Saturday's block",
   khan: "Khan Academy precalculus",
   // Never a required item: its minutes count toward the daily minimum like any other plan work.
-  moves: "Moves: daily set of 3 cards",
+  moves: "Daily cards",
 };
 
 /** Minutes of any plan item that keep the streak alive on an otherwise incomplete day. */

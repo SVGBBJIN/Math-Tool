@@ -1,26 +1,44 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useGuest } from "@/lib/guest/GuestProvider";
-import { markNothingToReview, reviewError } from "@/lib/guest/engine";
+import { logReview, markNothingToReview, reviewError } from "@/lib/guest/engine";
 import { ERROR_TYPES, label } from "@/lib/tags";
 import { ERROR_REVIEW_TARGET } from "@/lib/plan";
 import { weekday } from "@/lib/dates";
 import { ReviewClient, type MissRow, type ReviewActions } from "../../(app)/errors/ReviewClient";
-import { engineMissRows, engineReviewCounts } from "@/lib/engine/mistakes";
+import { learnMissRows, learnReviewCounts, missIdOf } from "@/lib/learn/misses";
+import { setMissTakeaway } from "@/lib/learn/record";
+import { emptyLearnState } from "@/lib/learn/state";
+import { useGuestLearn } from "@/components/learn/GuestLearnProvider";
 
 export default function GuestErrors() {
   const { state, today, update } = useGuest();
+  const learnCtx = useGuestLearn();
   const [type, setType] = useState<string | null>(null);
+  const learnStore = learnCtx?.store;
 
   const actions = useMemo<ReviewActions>(
     () => ({
-      reviewError: async (input) => update((d) => reviewError(d, input, today)),
-      markNothingToReview: async () => update((d) => markNothingToReview(d, today)),
+      reviewError: async (input) => {
+        const missId = missIdOf(input.attemptId);
+        if (!missId) return update((d) => reviewError(d, input, today, learnStore ? learnReviewCounts(learnStore.state, today) : undefined));
+        if (!learnStore) return { error: "Still loading" };
+        const takeaway = input.takeaway.trim();
+        if (takeaway.length < 5) return { error: "Write what you'll do differently" };
+        const miss = learnStore.state.misses.find((m) => m.id === missId);
+        if (!miss) return { error: "Attempt not found" };
+        if (miss.takeaway) return { error: "Already reviewed" };
+        const next = learnStore.update((s) => setMissTakeaway(s, missId, takeaway, today));
+        update((d) => logReview(d, today, input.minutes, learnReviewCounts(next, today)));
+        return {};
+      },
+      markNothingToReview: async () => update((d) => markNothingToReview(d, today, learnStore ? learnReviewCounts(learnStore.state, today) : undefined)),
     }),
-    [update, today],
+    [update, today, learnStore],
   );
 
   if (!state) return <p className="card text-muted">Loading…</p>;
+  const learn = learnStore?.state ?? emptyLearnState();
 
   const reviewBy = new Map(state.errorReviews.map((r) => [r.attempt_id, r]));
   const trainerRows: MissRow[] = state.attempts
@@ -43,14 +61,14 @@ export default function GuestErrors() {
         seconds: a.seconds,
       };
     });
-  // Misses from move-based practice sit in the same log, oldest first.
-  const rows = [...trainerRows, ...(state.engine ? engineMissRows(state.engine) : [])].sort((a, b) => a.date.localeCompare(b.date));
+  // Misses from the learning cards sit in the same log, oldest first.
+  const rows = [...trainerRows, ...learnMissRows(learn)].sort((a, b) => a.date.localeCompare(b.date));
 
-  const freshAttempts = state.attempts.filter((a) => a.finalized && !a.familiar).length + (state.engine?.logs.length ?? 0);
+  const freshAttempts = state.attempts.filter((a) => a.finalized && !a.familiar).length + learn.events.filter((e) => e.dimension !== "comprehension" && !e.legacy).length;
   const unfamiliarMisses = rows.filter((r) => !r.familiar);
   const counts = Object.fromEntries(ERROR_TYPES.map((e) => [e.value, unfamiliarMisses.filter((r) => r.errorType === e.value).length]));
   const carelessShare = unfamiliarMisses.length ? Math.round(((counts.careless ?? 0) + (counts.misread ?? 0)) / unfamiliarMisses.length * 100) : 0;
-  const reviewedToday = state.errorReviews.filter((r) => r.local_date === today).length + (state.engine ? engineReviewCounts(state.engine, today).reviewedToday : 0);
+  const reviewedToday = state.errorReviews.filter((r) => r.local_date === today).length + learnReviewCounts(learn, today).reviewedToday;
   const pending = rows.filter((r) => !r.takeaway);
   const shown = type ? rows.filter((r) => r.errorType === type) : rows;
 

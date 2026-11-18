@@ -1,25 +1,13 @@
-// Guest mode: the same trainer / review / plan rules as the signed-in app, but over a plain
-// JSON state kept in the browser. Functions mutate the draft state they are given; the
-// provider clones before calling and persists afterwards. No I/O here, so it is unit-testable.
+// Guest mode: the problem bank, error log and settings over a plain JSON state kept in the
+// browser. Functions mutate the draft state they are given; the provider clones before
+// calling and persists afterwards. No I/O here, so it is unit-testable.
+// The learning record (cards, mastery, review) is stored separately by src/lib/learn.
 import demoProblems from "../../../scripts/demo/problems.json";
-import { addDays, localDate } from "../dates";
-import {
-  ERROR_REVIEW_TARGET,
-  evaluateDay,
-  khanRequiredOn,
-  requiredItems,
-  type ActivityRow,
-  type DayStatus,
-  type PlanItem,
-} from "../plan";
-import { applyMiss, applyTwinOutcome, primaryTechnique } from "../review";
-import { comfortLevel, pickTrainerProblems, type TagStat } from "../trainer";
+import { localDate } from "../dates";
+import { ERROR_REVIEW_TARGET, type PlanItem } from "../plan";
 import type { ProblemInput, ProblemStatus } from "../problem-input";
-import { dailyStatus, isEngineProgress, minutesOn, setMistakeTakeaway, unreviewedMistakes, type EngineProgress } from "../engine/progress";
-import { ENGINE_MISS_PREFIX } from "../engine/mistakes";
 
 export const GUEST_STATE_VERSION = 1;
-const MAX_MINUTES_PER_PROBLEM = 20;
 
 export interface GuestSettings {
   timezone: string;
@@ -90,8 +78,11 @@ export interface GuestState {
   reviewItems: GuestReviewItem[];
   errorReviews: GuestErrorReview[];
   activity: GuestActivity[];
-  /** Move-based practice engine progress. Optional so older saves and backups still load. */
-  engine?: EngineProgress;
+  /**
+   * Progress of the earlier move-based engine. No longer written; kept so older saves and
+   * backups still load, and imported once into the learning record (src/lib/learn/legacy.ts).
+   */
+  engine?: unknown;
 }
 
 export function uid(): string {
@@ -145,210 +136,12 @@ export function todayOf(s: GuestState): string {
   }
 }
 
-// ---------- plan / streak ----------
-
-function activityRows(s: GuestState, date: string): ActivityRow[] {
-  return s.activity.filter((a) => a.local_date === date).map(({ item, minutes, completed }) => ({ item, minutes, completed }));
-}
-
-export function dayStatus(s: GuestState, date: string): DayStatus {
-  return evaluateDay(requiredItems(date, { khanRequired: khanRequiredOn(date) }), activityRows(s, date));
-}
-
-/** date -> minimum met, for the last `days` days. */
-export function keptMap(s: GuestState, today: string, days = 70): Map<string, boolean> {
-  const from = addDays(today, -days);
-  const dates = new Set(s.activity.filter((a) => a.local_date >= from && a.local_date <= today).map((a) => a.local_date));
-  const kept = new Map<string, boolean>();
-  for (const d of dates) kept.set(d, dayStatus(s, d).minimumMet);
-  return kept;
-}
-
 function upsertActivity(s: GuestState, date: string, item: PlanItem, minutes: number, completed: boolean) {
   const row = s.activity.find((a) => a.local_date === date && a.item === item);
   if (row) {
     row.minutes = minutes;
     row.completed = completed;
   } else s.activity.push({ local_date: date, item, minutes, completed });
-}
-
-// ---------- trainer ----------
-
-function studentStats(s: GuestState) {
-  const byId = new Map(s.problems.map((p) => [p.id, p]));
-  const rows = [...s.attempts]
-    .sort((a, b) => b.created_at.localeCompare(a.created_at))
-    .slice(0, 500)
-    .flatMap((a) => {
-      const p = byId.get(a.problem_id);
-      return p ? [{ a, p }] : [];
-    });
-  const tagStats = new Map<string, TagStat>();
-  for (const { a, p } of rows) {
-    if (a.familiar) continue;
-    for (const t of p.technique_tags) {
-      const st = tagStats.get(t) ?? { attempts: 0, correct: 0 };
-      st.attempts++;
-      if (a.correct) st.correct++;
-      tagStats.set(t, st);
-    }
-  }
-  const comfort = comfortLevel(
-    rows.slice(0, 60).map(({ a, p }) => ({ difficulty: p.difficulty, correct: a.correct, familiar: a.familiar })),
-  );
-  return { tagStats, comfort };
-}
-
-/** Today's trainer session, created on first visit. Null when no fresh problems are left. */
-export function getOrCreateSession(s: GuestState, today: string): GuestSession | null {
-  const existing = s.sessions.find((x) => x.local_date === today);
-  if (existing) return existing;
-
-  const seen = new Set(s.attempts.map((a) => a.problem_id));
-  const byId = new Map(s.problems.map((p) => [p.id, p]));
-  const candidates = s.problems
-    .filter((p) => p.status === "train" && !seen.has(p.id))
-    .map((p) => ({ id: p.id, difficulty: p.difficulty, techniqueTags: p.technique_tags }));
-  const dueItems = s.reviewItems
-    .filter((r) => r.status === "pending" && r.due_date <= today)
-    .map((r) => ({
-      id: r.id,
-      techniqueTag: r.technique_tag,
-      dueDate: r.due_date,
-      originProblemId: r.origin_problem_id,
-      originDifficulty: (r.origin_problem_id && byId.get(r.origin_problem_id)?.difficulty) || null,
-    }));
-  const { tagStats, comfort } = studentStats(s);
-  const picks = pickTrainerProblems({ candidates, dueItems, tagStats, comfort });
-  if (picks.length === 0) return null;
-
-  const session: GuestSession = {
-    id: uid(),
-    local_date: today,
-    problem_ids: picks.map((p) => p.problemId),
-    slot_reasons: picks.map((p) => p.reason),
-    review_item_ids: picks.map((p) => p.reviewItemId),
-    completed_at: null,
-  };
-  s.sessions.push(session);
-  return session;
-}
-
-/** Recompute the trainer activity row from the session's attempts. */
-function refreshTrainerActivity(s: GuestState, session: GuestSession): boolean {
-  const rows = s.attempts.filter((a) => a.session_id === session.id);
-  const minutes = rows.reduce((sum, r) => sum + Math.min(r.seconds / 60, MAX_MINUTES_PER_PROBLEM), 0);
-  const finalized = new Set(rows.filter((r) => r.finalized).map((r) => r.problem_id));
-  // Problems deleted from the bank mid-session can never be finalized; don't wait on them.
-  const alive = new Set(s.problems.map((p) => p.id));
-  const required = session.problem_ids.filter((id) => alive.has(id));
-  const completed = required.length > 0 && required.every((id) => finalized.has(id));
-  upsertActivity(s, session.local_date, "trainer", Math.round(minutes * 10) / 10, completed);
-  if (completed && !session.completed_at) session.completed_at = new Date().toISOString();
-  return completed;
-}
-
-export interface SubmitInput {
-  sessionId: string;
-  problemId: string;
-  answer: string | null;
-  confidence: number;
-  familiar: boolean;
-  seconds: number;
-}
-
-export type SubmitOutcome =
-  | { ok: true; attemptId: string; correct: boolean; correctAnswer: string; solutionUrl: string | null }
-  | { ok: false; error: string };
-
-export function submitAttempt(s: GuestState, input: SubmitInput, today: string): SubmitOutcome {
-  const { sessionId, problemId, answer, confidence, familiar } = input;
-  const seconds = Math.max(0, Math.min(7200, Math.round(input.seconds)));
-  if (answer !== null && !["A", "B", "C", "D", "E"].includes(answer)) return { ok: false, error: "Invalid submission" };
-  if (![1, 2, 3].includes(confidence)) return { ok: false, error: "Invalid submission" };
-
-  const session = s.sessions.find((x) => x.id === sessionId);
-  if (!session) return { ok: false, error: "Session not found" };
-  const idx = session.problem_ids.indexOf(problemId);
-  if (idx < 0) return { ok: false, error: "Problem is not in this session" };
-  const problem = s.problems.find((p) => p.id === problemId);
-  if (!problem) return { ok: false, error: "Problem not found" };
-  const solutionUrl = problem.solution_url ?? problem.url ?? null;
-
-  const prior = s.attempts.find((a) => a.session_id === sessionId && a.problem_id === problemId);
-  if (prior) return { ok: true, attemptId: prior.id, correct: prior.correct, correctAnswer: problem.answer, solutionUrl };
-
-  const correct = answer === problem.answer;
-  const reviewItemId = session.review_item_ids[idx] ?? null;
-  const attempt: GuestAttempt = {
-    id: uid(),
-    problem_id: problemId,
-    session_id: sessionId,
-    review_item_id: reviewItemId,
-    local_date: session.local_date,
-    seconds,
-    answer,
-    correct,
-    confidence,
-    familiar,
-    key_idea: null,
-    error_type: null,
-    finalized: false,
-    created_at: new Date().toISOString(),
-  };
-  s.attempts.push(attempt);
-
-  // Spaced review bookkeeping.
-  const item = reviewItemId ? s.reviewItems.find((r) => r.id === reviewItemId) : undefined;
-  if (item) {
-    const next = applyTwinOutcome({ stage: item.stage, dueDate: item.due_date, status: item.status }, { correct, familiar }, today);
-    item.stage = next.stage;
-    item.due_date = next.dueDate;
-    item.status = next.status;
-  } else if (!correct) {
-    const tag = primaryTechnique(problem.technique_tags);
-    if (tag) {
-      const existing = s.reviewItems.find((r) => r.technique_tag === tag && r.status === "pending");
-      const next = applyMiss(existing ? { stage: existing.stage, dueDate: existing.due_date, status: existing.status } : null, today);
-      if (existing) {
-        existing.stage = next.stage;
-        existing.due_date = next.dueDate;
-        existing.origin_problem_id = problemId;
-      } else {
-        s.reviewItems.push({
-          id: uid(),
-          technique_tag: tag,
-          origin_problem_id: problemId,
-          stage: next.stage,
-          due_date: next.dueDate,
-          status: "pending",
-        });
-      }
-    }
-  }
-
-  refreshTrainerActivity(s, session);
-  return { ok: true, attemptId: attempt.id, correct, correctAnswer: problem.answer, solutionUrl };
-}
-
-export interface FinalizeInput {
-  attemptId: string;
-  keyIdea: string;
-  errorType: string | null;
-}
-
-export function finalizeAttempt(s: GuestState, input: FinalizeInput): { ok: boolean; error?: string; dayComplete?: boolean } {
-  const keyIdea = input.keyIdea.trim();
-  if (keyIdea.length < 5) return { ok: false, error: "Write at least a short sentence" };
-  if (keyIdea.length > 280) return { ok: false, error: "Keep it to one sentence" };
-  const attempt = s.attempts.find((a) => a.id === input.attemptId);
-  if (!attempt) return { ok: false, error: "Attempt not found" };
-  if (!attempt.correct && !input.errorType) return { ok: false, error: "Pick an error type for the miss" };
-  attempt.key_idea = keyIdea;
-  attempt.error_type = attempt.correct ? null : input.errorType;
-  attempt.finalized = true;
-  const session = s.sessions.find((x) => x.id === attempt.session_id);
-  return { ok: true, dayComplete: session ? refreshTrainerActivity(s, session) : false };
 }
 
 // ---------- error log ----------
@@ -358,48 +151,36 @@ function pendingMisses(s: GuestState) {
   return s.attempts.filter((a) => !a.correct && a.finalized && !reviewed.has(a.id));
 }
 
-export function reviewError(s: GuestState, input: { attemptId: string; takeaway: string; minutes: number }, today: string): { error?: string } {
+/** Misses from the learning cards, as counts the review needs (they are stored in the learning record). */
+export interface LearnMissCounts { reviewedToday: number; remaining: number }
+const NO_LEARN: LearnMissCounts = { reviewedToday: 0, remaining: 0 };
+
+/** Review a trainer miss. Learning-card misses are reviewed in the learning record, then logged with `logReview`. */
+export function reviewError(s: GuestState, input: { attemptId: string; takeaway: string; minutes: number }, today: string, learn: LearnMissCounts = NO_LEARN): { error?: string } {
   const takeaway = input.takeaway.trim();
   if (takeaway.length < 5) return { error: "Write what you'll do differently" };
   if (takeaway.length > 500) return { error: "Keep it under 500 characters" };
-  if (input.attemptId.startsWith(ENGINE_MISS_PREFIX)) {
-    // A miss from the move-based engine: the takeaway lives on the engine's own mistake record.
-    const id = input.attemptId.slice(ENGINE_MISS_PREFIX.length);
-    const miss = s.engine?.mistakes.find((m) => m.id === id);
-    if (!s.engine || !miss) return { error: "Attempt not found" };
-    if (miss.takeaway) return { error: "Already reviewed" };
-    s.engine = setMistakeTakeaway(s.engine, id, takeaway, today);
-  } else {
-    if (s.errorReviews.some((r) => r.attempt_id === input.attemptId)) return { error: "Already reviewed" };
-    if (!s.attempts.some((a) => a.id === input.attemptId)) return { error: "Attempt not found" };
-    s.errorReviews.push({ attempt_id: input.attemptId, takeaway, local_date: today });
-  }
+  if (s.errorReviews.some((r) => r.attempt_id === input.attemptId)) return { error: "Already reviewed" };
+  if (!s.attempts.some((a) => a.id === input.attemptId)) return { error: "Attempt not found" };
+  s.errorReviews.push({ attempt_id: input.attemptId, takeaway, local_date: today });
+  logReview(s, today, input.minutes, learn);
+  return {};
+}
 
-  const engine = s.engine?.mistakes ?? [];
-  const reviewedToday = s.errorReviews.filter((r) => r.local_date === today).length + engine.filter((m) => m.reviewedOn === today).length;
-  const remaining = pendingMisses(s).length + engine.filter((m) => !m.takeaway).length;
+/** Update today's error-review activity: done after the target number of reviews, or when nothing is left. */
+export function logReview(s: GuestState, today: string, minutes: number, learn: LearnMissCounts = NO_LEARN) {
+  const reviewedToday = s.errorReviews.filter((r) => r.local_date === today).length + learn.reviewedToday;
+  const remaining = pendingMisses(s).length + learn.remaining;
   const done = reviewedToday >= ERROR_REVIEW_TARGET || (reviewedToday > 0 && remaining === 0);
   const current = s.activity.find((a) => a.local_date === today && a.item === "error_review")?.minutes ?? 0;
-  const minutes = Math.max(0, Math.min(30, input.minutes));
-  upsertActivity(s, today, "error_review", Math.round((current + minutes) * 10) / 10, done);
-  return {};
+  upsertActivity(s, today, "error_review", Math.round((current + Math.max(0, Math.min(30, minutes))) * 10) / 10, done);
 }
 
 /** When the error log is empty there is nothing to review; mark it done. */
-export function markNothingToReview(s: GuestState, today: string): { error?: string } {
-  if (pendingMisses(s).length || (s.engine && unreviewedMistakes(s.engine).length)) return { error: "There are still misses to review" };
+export function markNothingToReview(s: GuestState, today: string, learn: LearnMissCounts = NO_LEARN): { error?: string } {
+  if (pendingMisses(s).length || learn.remaining) return { error: "There are still misses to review" };
   upsertActivity(s, today, "error_review", 0, true);
   return {};
-}
-
-// ---------- move-based practice engine ----------
-
-/** Store the engine's progress and mirror today's engine work into the day's activity. */
-export function saveEngine(s: GuestState, progress: EngineProgress, today: string) {
-  s.engine = progress;
-  const minutes = minutesOn(progress, today);
-  const set = dailyStatus(progress, today);
-  if (minutes > 0 || set.done > 0) upsertActivity(s, today, "moves", minutes, set.complete);
 }
 
 // ---------- problem bank ----------
@@ -464,7 +245,6 @@ export function isGuestState(x: unknown): x is GuestState {
     typeof o.settings === "object" &&
     o.settings !== null &&
     typeof (o.settings as Record<string, unknown>).timezone === "string" &&
-    ["problems", "sessions", "attempts", "reviewItems", "errorReviews", "activity"].every((k) => Array.isArray(o[k])) &&
-    (o.engine === undefined || isEngineProgress(o.engine))
+    ["problems", "sessions", "attempts", "reviewItems", "errorReviews", "activity"].every((k) => Array.isArray(o[k]))
   );
 }

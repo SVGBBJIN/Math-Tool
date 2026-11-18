@@ -1,14 +1,14 @@
 # AMC Coach
 
-A single-family accountability and training app for a 9th grader preparing for the AMC 10, plus daily Khan Academy
-precalculus. Next.js (App Router, TypeScript) · Supabase (Postgres, auth, storage) · Vercel · Sendblue · Anthropic API.
+Three short cards a day to become a better AMC 10 problem solver, plus a problem bank, error log and accountability
+tools for one family. Next.js (App Router, TypeScript) · Supabase (Postgres, auth, storage) · Vercel · Sendblue · Anthropic API.
 
 ## Status
 
 | Milestone | Scope | State |
 |---|---|---|
-| **M1** | Schema, auth, problem bank, trainer, error log | ✅ built, tested |
-| **Moves** | Move-based practice engine (see below) | ✅ built, tested; Supabase path not yet run against a live database |
+| **M1** | Schema, auth, problem bank, trainer (since replaced by Learn), error log | ✅ built, tested |
+| **Learn** | Concept curriculum, card system, mastery and review engines (see below) | ✅ built, tested; Supabase path not yet run against a live database |
 | M2 | Sendblue sending, scheduler, inbound webhook, escalation tests | next |
 | M3 | Khan Academy proof entry | |
 | M4 | Endurance mode + vault | |
@@ -47,7 +47,7 @@ Demo logins (local only): `parent@demo.local` / `student@demo.local`, password `
 ### Tests
 
 ```bash
-npm test          # unit tests: plan/streak, spaced review, trainer, practice engine
+npm test          # unit tests: learning system (curriculum, cards, mastery, review, selection, persistence, a full journey), guest, plan
 ```
 
 ```bash
@@ -55,7 +55,7 @@ npm run test:db   # row-level-security checks against the local Supabase (needs 
 ```
 
 ```bash
-npm run verify:cards   # re-verifies every engine card; also runs before every build
+npm run verify:cards   # validates the curriculum and every card; also runs before every build
 ```
 
 ## Guest mode
@@ -66,7 +66,7 @@ all progress lives in the browser's `localStorage` (`src/lib/guest`), and the mi
 
 - One person with full permissions: they train, log attempts, manage the problem bank (including sealing problems
   in the vault) and edit dates. There is no parent/student split.
-- Starts with the 20 original sample problems. Same daily plan, trainer, spaced-review and streak rules as the signed-in app
+- Starts with the 20 original sample problems. Same learning engines as the signed-in app
   (shared pure modules in `src/lib`; the guest engine is `src/lib/guest/engine.ts`, tested in `tests/guest.test.ts`).
 - Data is per browser: clearing site data or switching devices starts over. Settings has **Download / Restore backup**.
 - Guests can't get text reminders (they need an account).
@@ -76,26 +76,15 @@ all progress lives in the browser's `localStorage` (`src/lib/guest`), and the mi
 - **Accounts.** A parent signs up and confirms they are the parent or guardian. They create the household, then
   create the student's login. The student never signs up on their own. Parent and student have the same management powers (settings, vault, delete problems); only
   the student can log attempts. Row-level security covers every table (`tests/db/rls.test.ts`).
-- **Daily plan.** Mon/Tue/Thu/Fri trainer · Wed error-log review · Sat timed block · Sun review of Saturday
-  (`src/lib/plan.ts`). The streak survives if every required item is done **or** at least 10 minutes of plan work are
-  logged. An unfinished *today* never breaks the streak. Khan becomes a requirement in M3, and the timed block and
-  Sunday review arrive with M4. Until those milestones, Saturday and Sunday can only be kept by the 10-minute minimum.
+- **Daily plan and streak.** The weekday plan and streak rules (`src/lib/plan.ts`) and the stored activity rows are
+  kept, but no longer shown: the home page is the learning system below, with no streak.
 - **Problem bank.** Sources: `aops_wiki` (a link plus metadata; the database rejects stored problem text),
   `pasted`, and `generated` (M5; the database rejects generated problems in the vault). Statuses: train, vault
   (sealed: tags and answer hidden in the UI), burned. Add problems one at a time or by CSV:
   `contest,year,number,answer,topic,techniques[,status]` with tags separated by `;`, from the controlled vocabulary
   in `src/lib/tags.ts`.
-- **Trainer** (`src/lib/trainer.ts`). Three problems a day, chosen from problems never attempted:
-  1. Due review twins first: at most 2, oldest due date first, never the problem that was missed.
-  2. Then the weakest technique tags. Accuracy is smoothed (Laplace) and counts unfamiliar attempts only.
-  3. Then one stretch problem at the student's comfort level + 4 or higher.
-
-  The flow is a timer, then A–E or blank, confidence 1–3, and "seen before?". After submitting, the student sees the
-  result and must write a one-sentence key idea; a miss also needs an error type. Technique tags stay hidden until
-  after the attempt, so they don't hint at the method.
-- **Spaced review** (`src/lib/review.ts`). A miss queues the problem's primary technique tag. A twin (a different
-  problem with the same tag) is due in 1 day. Each correct, unfamiliar solve moves it to 3, then 7, then 21 days, and
-  a correct solve at 21 days retires it. Any miss resets it to 1 day. Attempts marked "seen before" don't move it.
+- **Trainer and spaced review of twins.** Removed with the rebuild; see "What was removed" below. Past attempts and
+  their reviews are kept and still appear in the error log.
 - **Error log.** All misses, with counts by error type and the share of careless + misread misses. Wednesday review:
   write a "next time I will…" takeaway for 5 misses (or all remaining) to complete the day.
 
@@ -109,79 +98,77 @@ all progress lives in the browser's `localStorage` (`src/lib/guest`), and the mi
   (SymPy / brute force).
 - **The vault is sealed in the UI only.** RLS still lets the student's account read vault answers. That's acceptable
   for a self-training tool; tighten it in M4 if needed.
-- **Answers before submission.** The trainer page never sends a problem's answer to the browser before an attempt.
 
-## Move-based practice engine (Moves tab)
+## The learning system (Today and Map tabs)
 
-Instead of picking A–E, the student solves by choosing moves, and every move is checked by computation.
-Code: `src/lib/engine` (pure logic), `src/components/engine` (UI), `tests/engine-*.test.ts`.
+Opening the app shows today's three cards. Each one teaches or tests one capability, takes about 20–45 seconds,
+and has no timer. Code: `src/lib/learn` (pure logic, no React), `src/components/learn` (UI), `tests/learn`.
 
-**One shell, two modules.** Both share a state, a set of moves, a verifier and a goal (`types.ts`).
+**Curriculum** (`src/lib/learn/curriculum`). Course → domain → unit → concept → learning objectives → cards. The AMC 10
+course has 40 concepts in five domains; each has a description, measurable objectives, prerequisites (`required`
+blocks the daily plan from starting it, `helpful` never blocks), techniques, related concepts and a mastery
+standard. 12 concepts have cards so far; the rest show on the map as "not written yet" and are never scheduled.
+`validateCurriculum` checks ids, objectives, references and cycles.
 
-- **Module A, expressions** (`expr/`). The state is an expression, a set of equations joined by "or", or a
-  congruence. The student picks a named move and supplies its parameters (the factor, the two numbers); the
-  engine builds the resulting line and `verify.ts` checks it against the previous line by numeric evaluation
-  at pseudo-random points. Expressions must agree in value. Equations must keep the same solution set, and a
-  rejected step names the root that was lost or added. Lines that become undefined where the old one was fine
-  are reported as domain problems.
-- **Module B, structures** (`struct/`). The state is a count built from slots, cases, a subtracted part and a
-  divisor. The verifier enumerates what the structure really builds on a scaled-down version and compares it,
-  outcome by outcome, with a brute-force list. A mismatch shows a concrete arrangement that was counted twice,
-  missed or not allowed. Scaled-down means the same slots in the same roles with a smaller pool.
+**Cards** (`src/lib/learn/cards`, content in `src/lib/learn/content`). Five types: insight, technique (teaches the
+method with a worked demonstration first), recognition, application and variation. Interactions: exact numbers,
+symbolic expressions (with a "factor completely" check), fill-in-the-blank reasoning, step ordering, tapping a
+figure, a written explanation compared against a model, and single or multiple selection. Application and variation
+cards must ask for the answer itself; single choice is capped at 20% of the bank. Card text uses `$…$` math and
+`**bold**`. Every card has an objective, difficulty, estimated time, hint, reasoning-based feedback (including known
+wrong answers and what they usually mean), explanation, takeaway, "use it when", and provenance. Some cards are
+generated from families with new numbers, so reviews need not repeat a problem.
 
-**Around the cards** (`progress.ts`, `config.ts`).
+**Verification** (`npm run verify:cards`, run before every build). Every card with a computable key is recomputed
+by an independent function in `content/verifiers.ts` (brute force, integer arithmetic, or exact arithmetic on
+a + b√d; geometry keys are also measured from the figure's coordinates). The checker must accept the key and reject
+every listed slip; the explanation must state the answer; markup must parse; no real contest names or problem
+numbers. Generated families are validated over 30 seeds and re-validated before a variant is shown. Cards with
+no computable key (ordering, explanations, "which approach" choices) are marked `reasoned` with a review note, and
+any numbers quoted in their explanations are rechecked.
 
-- A skill is one worked example, three easy reps and one twist. Mastery needs the twist. A skill opens when
-  the easy reps of its prerequisites are done.
-- Scaffolding dial: level 1 offers 4 moves, level 2 all moves, level 3 a blank page where the move is named
-  first. Hints go nudge, move name, full step; any hint removes mastery credit for that card.
-- The decision step has a visible timer (30 s for reps, 60 s for twists, per-card overrides). The reveal is
-  untimed. "Not sure" is always available and still shows the insight.
-- A miss or an assisted solve comes back as a fresh variant after 1, 3 and 7 days. Three misses in a row on a
-  skill re-show the worked example and park the skill for two days.
-- Daily set: one review from the queue, one new concept, one stretch from the weakest topic. Its minutes go
-  into `day_activity` as `moves` and count toward the 10-minute minimum; it is not a required plan item.
-- Quick reps (90 seconds) only draw from skills already worked in a lesson or daily set.
-- Misses appear in the Errors tab and the Wednesday review with problem, answer reached, correct answer, time,
-  error type and note. Every card is logged with topic, skill, level, time, wrong moves, hint level and result.
-- `CONTEST_DATE` in `config.ts` is a placeholder fallback (`NEXT_PUBLIC_CONTEST_DATE`); the date in Settings
-  wins. Pacing and the scaffolding/time ramp are computed from it.
+**Mastery** (`mastery.ts`). Everything is derived from one evidence log. A response is *clean* when it is right on
+the first try, with no hint, checked by the app (not self-judged), and not the same problem seen in the last 14 days
+(or a same-structure variant in the last 3). States: Locked → Available → Introduced → Developing (follows the idea)
+→ Practicing (one clean application) → Proficient (two different clean applications, one clean recognition, one
+clean variation) → Mastered (plus two clean successes after gaps of 3+ days, one after 7+, one an application or
+variation). Two recent misses mark a concept as needing reinforcement and cap it at Developing until a clean
+success. The map shows the evidence behind each state and the next thing that would move it.
 
-**How verification works.** `npm run verify:cards` (`src/lib/engine/verify-cards.ts`) runs before every build
-and fails it on any mismatch. For each of the 45 hand-written cards and 40 generated variants per generator it
-replays the reference path through the live verifier, then checks the key a second way that shares no code
-with it: exact polynomial identity, irreducibility of each factor and exact root tests for Module A; brute
-force of the full-size problem for Module B. `tests/engine-progress.test.ts` feeds it deliberately wrong keys
-to confirm they are caught.
+**Review** (`review.ts`). Per concept, not per card: intervals 1, 3, 7, 16, 35, 75 days. A clean, spaced success moves
+up a step; cramming the same day doesn't; a miss drops two steps and is due tomorrow.
 
-**Add a card.** Add an entry to `CARDS` in a pack file (`packs/quadratics.ts`, `packs/counting.ts`) with its
-start, goal, reference path and key move, then run `npm run verify:cards`.
+**Daily selection** (`select.ts`). Default Discover / Reinforce / Apply. With two slipping concepts or many overdue
+reviews it becomes Reinforce, Reinforce, Apply with nothing new; with three concepts open, it finishes those first.
+New concepts come from the domain furthest below its share of the contest (`data/topic-distribution.json`). Within a
+concept it follows teaching order and what evidence is missing; a card or problem family is never repeated in a day,
+and a seen card returns only after 7 days when nothing fresh exists. After the three, "One more card" is available,
+and any concept can be practised from the map.
 
-**Add a topic pack.** Write `packs/<name>.ts` exporting a `TopicPack` (skills, cards, `generate`) and list it
-in `registry.ts`. New Module A moves go in `expr/moves.ts`; new Module B problem shapes are templates
-registered with `registerTemplate`. Modular-arithmetic moves (reduce, cycle, evaluate) already exist and are
-tested, but no cards use them yet.
+**Storage** (`persistence.ts`). Local-first and versioned (v2). Guests keep the record in `localStorage` with a backup
+at the first save of each day (last 5 kept); unreadable data is set aside, never overwritten, and the newest good backup
+is restored. Settings → Download backup includes the learning record. Signed-in students keep it in the
+`engine_progress` row; the server action validates it and refuses to overwrite a row it cannot read. `LearnRepository`
+is the seam for a future backend.
 
-**Keeping content original.** No real contest problem, wording, name, year or number appears in the app; the
-verifier rejects card text that names one. Real problems are only tagged privately. `data/topic-distribution.json`
-holds aggregate topic shares and currently contains a placeholder estimate. Replace it with:
+**Migration from the Moves engine (v1).** Old card logs become evidence on the matching concepts, flagged as legacy:
+they count as exposure (Developing, scheduled for review) but never as clean evidence, because those cards offered a
+move menu and ran on a timer. Timeouts are dropped; mistakes and their takeaways move to the error log. The original
+document is kept as a backup.
 
-```bash
-npm run topics:build -- path/to/your-tagged.csv
-```
+**What was removed.** The Trainer tab (timed A–E problems) and the Moves tab (timed move-picking), with their engines
+and tests, and the streak, weekday checklist and heat grid on the home page. The problem bank, error log, settings,
+accounts, guest mode and the stored activity data are unchanged. The move cards' worked examples were reviewed and
+several were adapted into the new cards (marked `adapted` in their provenance).
 
-The CSV uses the problem bank's format (`contest,year,number,answer,topic,techniques`).
+**Add a card.** Add it to a file in `src/lib/learn/content`, add an independent verifier for a computable key, and run
+`npm run verify:cards`. A concept becomes schedulable once it has at least two teaching cards (one a technique),
+a checked recognition card, two applications and a variation.
 
 **Known limitations.**
 
-- The Supabase path (migration `20261115000000_move_engine.sql`, save action, parent view) is typechecked but
-  has not been run against a live database. Guest mode was tested in a browser.
-- Moves are verified in the browser, so answers ship to the client and a determined student could edit saved
-  progress.
-- Progress is one JSON document per student; two devices open at once overwrite each other.
-- Numeric verification is probabilistic in principle. Irrational roots get no named counterexample.
-- A move acts on a whole side or one top-level factor or term, not on deeper sub-expressions.
-- Hints after leaving the reference path only point back to its first step.
-- Module B covers ordered rows, unordered groups with an optional leader, and one glued pair. Probability is
-  not built.
-- "Shortest path" is hand-authored and replayed, not proven minimal.
+- The Supabase path (load, migrate and save of the learning record) is typechecked but has not been run against a
+  live database. Guest mode was tested in a browser.
+- 12 of 40 concepts have cards. Solving quadratics lost its move cards and has none yet.
+- Answers are checked in the browser, so keys ship to the client.
+- Explanations are self-assessed against a model answer, so they never count as clean evidence.
