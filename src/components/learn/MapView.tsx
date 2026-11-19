@@ -10,7 +10,7 @@ import { scheduleOf } from "@/lib/learn/review";
 import { nextInConcept, type Pick } from "@/lib/learn/select";
 import { CardView } from "./CardView";
 import { StateBadge, STATE_STYLE } from "./bits";
-import { progressFacts } from "./ProgressSummary";
+import { progressFacts } from "./ProgressView";
 import { recordCard, tagMiss } from "./practice";
 import type { LearnStore } from "./useLearnStore";
 

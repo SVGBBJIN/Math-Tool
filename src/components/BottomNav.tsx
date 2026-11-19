@@ -3,9 +3,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 // Each tab has its own color; the active one fills with it.
-const TABS = [
-  { href: "/", label: "Today", color: "var(--color-violet)" },
-  { href: "/map", label: "Map", color: "var(--color-brand)" },
+const TABS: { href: string; label: string; color: string; also?: string[] }[] = [
+  { href: "/", label: "Today", color: "var(--color-violet)", also: ["/problem"] },
+  { href: "/map", label: "Map", color: "var(--color-brand)", also: ["/progress"] },
   { href: "/errors", label: "Errors", color: "#be185d" },
   { href: "/problems", label: "Bank", color: "var(--color-apply)" },
   { href: "/settings", label: "Settings", color: "#b45309" },
@@ -18,7 +18,8 @@ export function BottomNav({ base = "" }: { base?: string }) {
       <ul className="shell-nav gap-1 px-1 py-1.5 md:py-2">
         {TABS.map((t) => {
           const href = t.href === "/" ? base || "/" : `${base}${t.href}`;
-          const active = t.href === "/" ? path === href : path.startsWith(href);
+          const extra = (t.also ?? []).some((a) => path.startsWith(`${base}${a}`));
+          const active = extra || (t.href === "/" ? path === href : path.startsWith(href));
           return (
             <li key={t.href}>
               <Link

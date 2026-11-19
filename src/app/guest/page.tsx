@@ -11,7 +11,7 @@ export default function GuestToday() {
   return (
     <>
       <LearnNotice />
-      <TodayView store={learn.store} today={today} mapHref="/guest/map" />
+      <TodayView store={learn.store} today={today} base="/guest" />
     </>
   );
 }

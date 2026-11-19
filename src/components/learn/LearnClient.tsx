@@ -7,9 +7,11 @@ import { toEnvelope } from "@/lib/learn/persistence";
 import type { LearnState } from "@/lib/learn/state";
 import { MapView } from "./MapView";
 import { TodayView } from "./TodayView";
+import { ProblemPage } from "./ProblemPage";
+import { ProgressView } from "./ProgressView";
 import { useLearnStore } from "./useLearnStore";
 
-export function LearnClient({ initial, notice, today, mode, readOnly }: { initial: LearnState; notice: string | null; today: string; mode: "today" | "map"; readOnly: boolean }) {
+export function LearnClient({ initial, notice, today, mode, readOnly }: { initial: LearnState; notice: string | null; today: string; mode: "today" | "map" | "problem" | "progress"; readOnly: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [shown, setShown] = useState(notice);
   const chain = useRef<Promise<void>>(Promise.resolve());
@@ -36,7 +38,10 @@ export function LearnClient({ initial, notice, today, mode, readOnly }: { initia
         </p>
       )}
       {readOnly && <p className="card mb-4 text-sm text-muted">Learning runs on the student&apos;s login. This is a read-only view of their progress.</p>}
-      {mode === "today" && !readOnly ? <TodayView store={store} today={today} mapHref="/map" /> : <MapView store={store} today={today} readOnly={readOnly} />}
+      {mode === "progress" ? <ProgressView store={store} today={today} base="" />
+        : mode === "problem" && !readOnly ? <ProblemPage store={store} today={today} base="" />
+        : mode === "today" && !readOnly ? <TodayView store={store} today={today} base="" />
+        : <MapView store={store} today={today} readOnly={readOnly} />}
     </>
   );
 }
