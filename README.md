@@ -10,6 +10,7 @@ tools for one family. Next.js (App Router, TypeScript) · Supabase (Postgres, au
 | **M1** | Schema, auth, problem bank, trainer (since replaced by Learn), error log | ✅ built, tested |
 | **Learn** | Concept curriculum, card system, mastery and review engines (see below) | ✅ built, tested; Supabase path not yet run against a live database |
 | **Daily Problem** | One step-by-step contest-style problem a day, verified bank (see below) | ✅ built, tested in guest mode |
+| **Calculator** | Floating step-by-step calculator on every page (see below) | ✅ built, tested |
 | M2 | Sendblue sending, scheduler, inbound webhook, escalation tests | next |
 | M3 | Khan Academy proof entry | |
 | M4 | Endurance mode + vault | |
@@ -115,6 +116,30 @@ logic), `src/components/learn/DailyProblemView.tsx` (UI), tests in `tests/learn/
 
 **Add a problem.** Add it to `problems/bank.ts` (or a family with `problemFamily`), add an independent verifier
 keyed by its id in `problems/verifiers.ts`, and run `npm run verify:cards`.
+
+## The step-by-step calculator
+
+A **Calculator** button floats above the tab bar on every page (signed in and guest). It opens a panel that doesn't
+block the page, so a problem stays visible beside it on a wide screen; on a phone it covers most of the screen. Esc or ✕
+closes it, and what you typed is kept while you move between pages. It shows every step with a short reason, then the
+answer. Code: `src/lib/calc` (pure, exact BigInt/rational math), `src/components/calculator/CalculatorPopup.tsx` (UI),
+tests in `tests/calc.test.ts`.
+
+| Area | Tools |
+|---|---|
+| Arithmetic | Exact fraction arithmetic (one operation per step, in order; fraction, mixed number and repeating decimal), base conversion (2–36) |
+| Number theory | Prime factorization, GCD and LCM (Euclidean algorithm), divisor count and sum, power mod m (cycle or repeated squaring) |
+| Counting | Combinations and permutations, arrangements with repeated letters, distributing identical items (stars and bars) |
+| Algebra | Quadratic equation (discriminant, simplified radicals, factoring, Vieta), systems of up to four linear equations (whole-number elimination with a check), arithmetic and geometric series (including infinite) |
+
+- **Input rules.** In expressions, `3/4` typed with a slash is a fraction and binds tighter than × and ÷, so
+  `12 * 3/4 = 9` and `12 ÷ 3/4 = 16`; `÷` always divides. `-2^2 = -4`. Bad input gets a plain-language message,
+  never a crash. Size limits keep every answer under about 120 digits (factorization up to 10¹²).
+- **Verification.** Tests check every tool against independent brute force (trial division, enumeration, Pascal's
+  triangle, direct summation, floating point) on hundreds of random inputs, and check that every step parses as
+  card markup so the popup can always render it.
+- **Add a tool.** Add a `Tool` to the right file in `src/lib/calc` (it lists its fields, an example and a `run` that
+  returns steps and an answer in card markup) and a brute-force test.
 
 ## Decisions & caveats
 

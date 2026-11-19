@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { BottomNav } from "@/components/BottomNav";
+import { CalculatorPopup } from "@/components/calculator/CalculatorPopup";
 import { GUEST_COOKIE, useGuest } from "@/lib/guest/GuestProvider";
 
 export function GuestShell({ children }: { children: React.ReactNode }) {
@@ -27,6 +28,7 @@ export function GuestShell({ children }: { children: React.ReactNode }) {
         </p>
       )}
       <main>{children}</main>
+      <CalculatorPopup />
       <BottomNav base="/guest" />
     </div>
   );
