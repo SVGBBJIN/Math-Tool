@@ -1,5 +1,6 @@
 import { requireContext } from "@/lib/session";
 import { BottomNav } from "@/components/BottomNav";
+import { CalculatorPopup } from "@/components/calculator/CalculatorPopup";
 import { signOut } from "../actions/account";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -18,6 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </form>
       </header>
       <main>{children}</main>
+      <CalculatorPopup />
       <BottomNav />
     </div>
   );
