@@ -6,6 +6,7 @@ import Link from "next/link";
 import { getCard } from "@/lib/learn/cards";
 import { conceptOf } from "@/lib/learn/curriculum";
 import { snapshots } from "@/lib/learn/mastery";
+import { ensureDailyProblem } from "@/lib/learn/problems";
 import { dailyStatus, ensureDaily, nextExtra, type Pick } from "@/lib/learn/select";
 import type { Role } from "@/lib/learn/state";
 import { CardView } from "./CardView";
@@ -13,16 +14,16 @@ import { Rich } from "./Rich";
 import { RoleChip } from "./bits";
 import { recordCard, tagMiss } from "./practice";
 import type { LearnStore } from "./useLearnStore";
-import { ProgressSummary } from "./ProgressSummary";
-import { DailyProblemView } from "./DailyProblemView";
+import { HubTiles } from "./HubTiles";
 
 const ROLE_DOT = { discover: "bg-brand/10 text-brand", reinforce: "bg-sun/15 text-[#9a6700]", apply: "bg-mastery/15 text-apply" } as const;
 
 const weekday = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
 
-export function TodayView({ store, today, mapHref }: { store: LearnStore; today: string; mapHref: string }) {
+export function TodayView({ store, today, base }: { store: LearnStore; today: string; base: string }) {
+  const mapHref = `${base}/map`;
   const { state, update } = store;
-  useEffect(() => { update((s) => ensureDaily(s, today)); }, [update, today]);
+  useEffect(() => { update((s) => ensureDailyProblem(ensureDaily(s, today), today)); }, [update, today]);
   const slots = useMemo(() => (state.daily?.date === today ? state.daily.slots : []), [state.daily, today]);
   const status = dailyStatus(state, today);
   // The card being looked at. It stays open after it is answered, until "Next".
@@ -43,12 +44,19 @@ export function TodayView({ store, today, mapHref }: { store: LearnStore; today:
 
   return (
     <div className="space-y-5 md:space-y-6">
-      <header className="flex items-end justify-between gap-3 px-1">
-        <div>
-          <p className="text-sm font-semibold text-muted">{weekday(today)}</p>
-          <h1 className="brand-text text-3xl font-extrabold tracking-tight md:text-4xl">{status.complete ? "Today's three: done" : "Today's three"}</h1>
+      <header className="hero card-in" style={{ ["--h1" as string]: "#1865f2", ["--h2" as string]: "#7c3aed" }}>
+        <span className="hero-orb hero-orb-a" aria-hidden />
+        <span className="hero-orb hero-orb-b" aria-hidden />
+        <div className="relative flex items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/75">{weekday(today)}</p>
+            <h1 className="mt-1 text-3xl font-black tracking-tight md:text-4xl">{status.complete ? "Today's three: done" : "Today's three"}</h1>
+          </div>
+          <p className="shrink-0 rounded-full bg-white px-3 py-1 text-sm font-bold text-violet shadow-sm">{status.complete ? `${status.total} of ${status.total}` : `~${Math.max(1, Math.round(seconds / 60 * 2) / 2)} min left`}</p>
         </div>
-        <p className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-violet shadow-sm ring-1 ring-violet/15">{status.complete ? `${status.total} of ${status.total}` : `about ${Math.max(1, Math.round(seconds / 60 * 2) / 2)} min left`}</p>
+        <div className="relative mt-4 flex gap-1.5" aria-hidden>
+          {slots.map((sl) => <span key={sl.cardId} className={`h-2 flex-1 rounded-full ${sl.done ? "bg-white" : "bg-white/30"}`} />)}
+        </div>
       </header>
 
       <ol className="space-y-3">
@@ -106,9 +114,7 @@ export function TodayView({ store, today, mapHref }: { store: LearnStore; today:
         </section>
       )}
 
-      <DailyProblemView store={store} today={today} />
-
-      <ProgressSummary snaps={snaps} events={state.events} mapHref={mapHref} />
+      <HubTiles store={store} today={today} base={base} />
     </div>
   );
 }
